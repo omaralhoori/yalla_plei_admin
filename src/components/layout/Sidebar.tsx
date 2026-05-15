@@ -1,18 +1,20 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Dumbbell, Users, MapPin, Wrench,
-  Calendar, CreditCard, Settings, Trophy,
+  Calendar, CreditCard, Settings, Trophy, Gift,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/users', icon: Users, label: 'Users' },
   { to: '/sports', icon: Dumbbell, label: 'Sports' },
   { to: '/teams', icon: Trophy, label: 'Teams' },
   { to: '/pitches', icon: MapPin, label: 'Pitches' },
   { to: '/services', icon: Wrench, label: 'Services' },
   { to: '/matches', icon: Calendar, label: 'Matches' },
   { to: '/financials', icon: CreditCard, label: 'Financials' },
+  { to: '/loyalty', icon: Gift, label: 'Loyalty' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ] as const
 

@@ -205,7 +205,7 @@ export default function FinancialsPage() {
               )} />
               <FormField control={form.control} name="amount" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Refund Amount (SAR)</FormLabel>
+                  <FormLabel>Refund Amount (JOD)</FormLabel>
                   <FormControl><Input type="number" step="0.01" min="0.01" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

@@ -1,9 +1,21 @@
 # Yalla Plei Admin Dashboard — Project Summary
 
-> **Stack**: React 18 + Vite + TypeScript (strict) · Tailwind CSS · Shadcn UI · React Router v6 · TanStack Query v5 · React Hook Form + Zod · Recharts · Axios  
+> **Stack**: React 18 + Vite + TypeScript (strict) · Tailwind CSS + Shadcn UI · React Router v6 · TanStack Query v5 · React Hook Form + Zod · Recharts · Axios  
 > **API Base**: `https://api.yallaplei.com/api/v1`  
 > **Build**: `npm run build` → `dist/`  
 > **Docker**: `docker build --build-arg VITE_API_BASE_URL=<url> -t yalla-plei-admin .`
+
+---
+
+## Global Standards
+
+### Currency
+All monetary values are displayed in **Jordanian Dinar (JOD / دينار أردني)** using the `formatCurrency(amount)` utility from `src/lib/utils.ts`. Format: `15.00 JOD`.
+
+### Timezone
+- **Display**: All UTC timestamps from the API are automatically converted to the user's **browser local timezone** via `formatDate()` and `formatDateTime()` (use the native `Date` object which applies local TZ automatically).
+- **Submission**: Form date/time inputs (local timezone) are converted back to **UTC ISO strings** before sending to the API via `localDateTimeToUtc(date, time)`.
+- Additional helpers: `utcToLocalDate(utcStr)`, `utcToLocalTime(utcStr)` — used in match edit forms to pre-populate date/time fields from UTC API values.
 
 ---
 
@@ -30,18 +42,23 @@ yalla-plei-admin/
 │   │   │   └── LoginPage.tsx       # Email/password login with JWT storage
 │   │   ├── dashboard/
 │   │   │   └── DashboardPage.tsx   # Reports summary + Recharts visualizations
+│   │   ├── users/
+│   │   │   ├── UsersPage.tsx       # Paginated user list with search/role filter + create admin modal
+│   │   │   └── UserDetailPage.tsx  # User stats, player profiles, adjust points dialog
 │   │   ├── sports/
 │   │   │   ├── SportsPage.tsx      # Sports CRUD with image upload + toggles
 │   │   │   └── TeamsPage.tsx       # Teams CRUD with logo upload + pagination
 │   │   ├── pitches/
-│   │   │   ├── PitchesPage.tsx     # Pitches CRUD with service selector + image
+│   │   │   ├── PitchesPage.tsx     # Pitches CRUD + search bar + surface_type filter
 │   │   │   └── ServicesPage.tsx    # Pitch amenities CRUD
 │   │   ├── matches/
-│   │   │   └── MatchesPage.tsx     # Match scheduling/editing/cancellation
+│   │   │   └── MatchesPage.tsx     # Match scheduling via /admin/matches + date/pitch/status filters + pitch services override
 │   │   ├── financials/
-│   │   │   └── FinancialsPage.tsx  # Transaction table + manual refund flow
+│   │   │   └── FinancialsPage.tsx  # Transaction table + manual refund flow (JOD)
+│   │   ├── loyalty/
+│   │   │   └── LoyaltyPage.tsx     # Tabbed: Levels CRUD (with 409 overlap handling) + Rewards CRUD (with ImageUpload)
 │   │   └── settings/
-│   │       └── SettingsPage.tsx    # Tabbed: Cancellation Policies + extensible
+│   │       └── SettingsPage.tsx    # Tabbed: Cancellation Policies CRUD + extensible placeholder tabs
 │   ├── hooks/
 │   │   ├── useAuth.ts              # JWT decode, token helpers, role check
 │   │   ├── usePagination.ts        # offset/limit pagination state
@@ -49,7 +66,7 @@ yalla-plei-admin/
 │   ├── lib/
 │   │   ├── api.ts                  # Axios instance + request/response interceptors
 │   │   ├── queryClient.ts          # TanStack Query client config
-│   │   └── utils.ts                # cn(), formatCurrency(), formatDate()
+│   │   └── utils.ts                # cn(), formatCurrency() [JOD], formatDate/Time(), timezone helpers
 │   ├── router/
 │   │   └── index.tsx               # Routes + ProtectedRoute guard
 │   ├── types/
@@ -83,13 +100,16 @@ yalla-plei-admin/
 ### Pages & Modules
 - [x] **Login** — Email/password form, Zod validation, inline error handling, show/hide password
 - [x] **Dashboard** — Date range filter, 4 stat cards, AreaChart + BarChart + PieChart via Recharts
+- [x] **Users (CRM)** — Paginated user list, search by name/email/phone, role filter, "View" drill-down, create admin/manager modal
+- [x] **User Detail** — Aggregate stats (points, matches, goals, assists, MVPs), player profiles per sport with level, adjust loyalty points dialog
 - [x] **Sports** — Full CRUD (list, create, edit, delete) with image upload and enable/available toggles
 - [x] **Teams** — Full CRUD with paginated list and logo upload
-- [x] **Pitches** — Full CRUD with sport selector, surface type, image upload, multi-service assignment
+- [x] **Pitches** — Full CRUD + **search bar** + **surface_type dropdown filter** + service assignment
 - [x] **Services** — Full CRUD for pitch amenities
-- [x] **Matches** — Schedule/edit/cancel with sport filter, cancellation triggers wallet refunds
-- [x] **Financials** — Filterable transactions (status/source/date range), manual refund with confirmation
-- [x] **Settings** — Tabbed layout with full cancellation policy CRUD; extensible with placeholder tabs
+- [x] **Matches** — Uses `/admin/matches` (all statuses) + **date-range pickers** + **pitch filter** + **status filter** + per-match services checklist pre-populated from pitch defaults (local ↔ UTC timezone conversion)
+- [x] **Financials** — Filterable transactions (status/source/date range), manual refund with 2-step confirmation (JOD currency)
+- [x] **Loyalty** — Tabbed: Levels CRUD (409 overlap error shown inline) + Rewards CRUD (image upload, required points)
+- [x] **Settings** — Tabbed layout with full cancellation policy CRUD; extensible placeholder tabs
 
 ### Shared Components
 - [x] `DataTable<T>` — generic typed table with skeleton loading and pagination
@@ -117,17 +137,15 @@ yalla-plei-admin/
 ## TODO / Pending Integrations
 
 ### High Priority
-- [ ] **Real pagination for transactions** — API currently returns an array; wire up `PaginatedResponse` envelope once backend is confirmed
-- [ ] **Match detail view** — `/api/v1/matches/:id` with confirmed player count and available slots
-- [ ] **Users management** — View/search all users, suspend/activate accounts
-- [ ] **Bookings management** — Admin view of all bookings, manual cancel with refund
-
-### Medium Priority
-- [ ] **Dark mode toggle** — CSS variables are ready; add a theme context and header toggle
-- [ ] **Role-specific UI** — Show/hide destructive actions based on `manager` vs `admin` role
+- [ ] **Bookings management** — Admin view of all bookings (`GET /admin/bookings`?), manual cancel with refund
 - [ ] **Real-time notifications** — FCM integration for in-browser push alerts
 - [ ] **Refresh token flow** — Implement token refresh instead of hard logout on expiry
-- [ ] **Search/filter on tables** — Add search inputs to Sports, Teams, Pitches pages
+
+### Medium Priority
+- [ ] **Role-specific UI** — Show/hide destructive actions based on `manager` vs `admin` role
+- [ ] **Dark mode toggle** — CSS variables are ready; add a theme context and header toggle
+- [ ] **User wallet view** — Show a user's wallet balance and transaction history from the detail page
+- [ ] **Bookings per user** — Show booking history on the User Detail page
 
 ### Low Priority
 - [ ] **i18n (Arabic/English)** — RTL layout support with `react-i18next`
@@ -135,8 +153,8 @@ yalla-plei-admin/
 - [ ] **Unit tests** — Vitest for hooks (`useAuth`, `usePagination`) and utils
 - [ ] **CI/CD pipeline** — GitHub Actions: lint → typecheck → build → Docker push
 - [ ] **Error boundary** — Global React error boundary with friendly fallback UI
-- [ ] **Analytics dashboard v2** — Time-series charts using daily breakdown endpoint (if added)
 - [ ] **Export to CSV** — Download transactions table as CSV
+- [ ] **Highlights module** — `GET /highlights` view/moderation page
 
 ---
 

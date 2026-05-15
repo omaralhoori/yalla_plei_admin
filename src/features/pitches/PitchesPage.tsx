@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet'
@@ -41,10 +41,19 @@ export default function PitchesPage() {
   const [deleteTarget, setDeleteTarget] = useState<Pitch | null>(null)
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
 
+  // Filter state
+  const [search, setSearch] = useState('')
+  const [surfaceFilter, setSurfaceFilter] = useState('')
+  const [applied, setApplied] = useState({ search: '', surface_type: '' })
+
   const { data: pitches = [], isLoading } = useQuery({
-    queryKey: ['pitches'],
+    queryKey: ['pitches', applied],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<Pitch[]>>('/pitches')
+      const params = new URLSearchParams()
+      if (applied.search) params.set('search', applied.search)
+      if (applied.surface_type) params.set('surface_type', applied.surface_type)
+      const qs = params.toString()
+      const res = await api.get<ApiResponse<Pitch[]>>(`/pitches${qs ? `?${qs}` : ''}`)
       return res.data.data
     },
   })
@@ -172,6 +181,42 @@ export default function PitchesPage() {
         subtitle="Manage sport venues and their amenities"
         action={<Button onClick={openCreate}><Plus className="w-4 h-4 mr-2" />Add Pitch</Button>}
       />
+
+      {/* Filter bar */}
+      <div className="bg-white border rounded-lg p-4 mb-4 flex flex-wrap gap-3 items-end">
+        <div className="space-y-1 flex-1 min-w-[200px]">
+          <Label>Search</Label>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Pitch name..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && setApplied({ search, surface_type: surfaceFilter })}
+              className="pl-8"
+            />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <Label>Surface Type</Label>
+          <Select value={surfaceFilter} onValueChange={v => setSurfaceFilter(v === 'all' ? '' : v)}>
+            <SelectTrigger className="w-44"><SelectValue placeholder="All surfaces" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All surfaces</SelectItem>
+              {SURFACE_TYPES.map(t => (
+                <SelectItem key={t} value={t}>{t.replace(/_/g, ' ')}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button
+          onClick={() => setApplied({ search, surface_type: surfaceFilter })}
+          className="gap-2"
+        >
+          <RefreshCw className="w-4 h-4" />Apply
+        </Button>
+      </div>
+
       <DataTable columns={columns} data={pitches} isLoading={isLoading} />
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>

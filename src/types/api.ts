@@ -160,6 +160,7 @@ export interface MatchPayload {
   join_price: number
   cancellation_policy_id: string
   status?: MatchStatus
+  service_ids?: string[]
 }
 
 // ─── Financial Transaction ───────────────────────────────────────────────────
@@ -209,4 +210,93 @@ export interface ReportSummary {
 
 export interface UploadResponse {
   url: string
+}
+
+// ─── Admin User ───────────────────────────────────────────────────────────────
+
+export interface AdminUser {
+  id: string
+  name: string
+  email: string
+  phone: string
+  role: 'player' | 'admin' | 'manager'
+  gender: 'male' | 'female'
+  auth_provider: string
+  is_phone_verified: boolean
+  is_email_verified: boolean
+  created_at: string
+}
+
+export interface PlayerProfile {
+  id: string
+  sport_id: string
+  total_points: number
+  preferred_position?: string
+  preferred_foot?: string
+  shirt_number?: number
+  shirt_size?: string
+  shoe_size?: number
+  level?: { id: string; name_ar: string; name_en: string; min_points: number; max_points: number }
+  favorite_team?: { id: string; name_ar: string; name_en: string; logo_url: string }
+  sport?: { id: string; name_ar: string; name_en: string }
+}
+
+export interface AdminUserDetail {
+  user: AdminUser
+  player_profiles: PlayerProfile[]
+  total_points: number
+  stats: {
+    total_goals: number
+    total_assists: number
+    total_mvps: number
+    total_matches: number
+  }
+}
+
+export interface CreateAdminUserPayload {
+  name: string
+  email: string
+  phone: string
+  password: string
+  role: 'player' | 'manager' | 'admin'
+  gender: 'male' | 'female'
+}
+
+export interface AdjustPointsPayload {
+  points: number
+  description: string
+}
+
+// ─── Level ────────────────────────────────────────────────────────────────────
+
+export interface Level {
+  id: string
+  name_ar: string
+  name_en: string
+  min_points: number
+  max_points: number
+}
+
+export interface LevelPayload {
+  name_ar: string
+  name_en: string
+  min_points: number
+  max_points: number
+}
+
+// ─── Reward ───────────────────────────────────────────────────────────────────
+
+export interface Reward {
+  id: string
+  name_ar: string
+  name_en: string
+  image_url: string
+  required_points: number
+}
+
+export interface RewardPayload {
+  name_ar: string
+  name_en: string
+  image_url: string
+  required_points: number
 }

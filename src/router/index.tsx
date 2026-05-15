@@ -12,6 +12,9 @@ const ServicesPage = lazy(() => import('@/features/pitches/ServicesPage'))
 const MatchesPage = lazy(() => import('@/features/matches/MatchesPage'))
 const FinancialsPage = lazy(() => import('@/features/financials/FinancialsPage'))
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'))
+const UsersPage = lazy(() => import('@/features/users/UsersPage'))
+const UserDetailPage = lazy(() => import('@/features/users/UserDetailPage'))
+const LoyaltyPage = lazy(() => import('@/features/loyalty/LoyaltyPage'))
 
 function ProtectedRoute() {
   if (!isAuthenticated()) {
@@ -47,12 +50,15 @@ export const router = createBrowserRouter([
     element: <ProtectedRoute />,
     children: [
       { path: '/dashboard', element: <DashboardPage /> },
+      { path: '/users', element: <UsersPage /> },
+      { path: '/users/:id', element: <UserDetailPage /> },
       { path: '/sports', element: <SportsPage /> },
       { path: '/teams', element: <TeamsPage /> },
       { path: '/pitches', element: <PitchesPage /> },
       { path: '/services', element: <ServicesPage /> },
       { path: '/matches', element: <MatchesPage /> },
       { path: '/financials', element: <FinancialsPage /> },
+      { path: '/loyalty', element: <LoyaltyPage /> },
       { path: '/settings', element: <SettingsPage /> },
     ],
   },
