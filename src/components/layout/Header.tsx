@@ -30,7 +30,10 @@ export default function Header() {
   const { t, i18n } = useTranslation()
   const { theme, toggleTheme } = useTheme()
   const user = getUser()
-  const pageTitle = t(breadcrumbKeys[pathname] ?? 'nav.dashboard', { defaultValue: 'Admin' })
+  // Match /matches/:id with a simple prefix check
+  const breadcrumbKey = breadcrumbKeys[pathname]
+    ?? (pathname.startsWith('/matches/') ? 'nav.matches' : 'nav.dashboard')
+  const pageTitle = t(breadcrumbKey, { defaultValue: 'Admin' })
 
   function handleLogout() {
     clearAllTokens()

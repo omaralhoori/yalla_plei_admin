@@ -10,6 +10,7 @@ const TeamsPage = lazy(() => import('@/features/sports/TeamsPage'))
 const PitchesPage = lazy(() => import('@/features/pitches/PitchesPage'))
 const ServicesPage = lazy(() => import('@/features/pitches/ServicesPage'))
 const MatchesPage = lazy(() => import('@/features/matches/MatchesPage'))
+const MatchDetailPage = lazy(() => import('@/features/matches/MatchDetailPage'))
 const BookingsPage = lazy(() => import('@/features/bookings/BookingsPage'))
 const FinancialsPage = lazy(() => import('@/features/financials/FinancialsPage'))
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'))
@@ -59,6 +60,7 @@ export const router = createBrowserRouter([
       { path: '/pitches', element: <PitchesPage /> },
       { path: '/services', element: <ServicesPage /> },
       { path: '/matches', element: <MatchesPage /> },
+      { path: '/matches/:id', element: <MatchDetailPage /> },
       { path: '/bookings', element: <BookingsPage /> },
       { path: '/financials', element: <FinancialsPage /> },
       { path: '/loyalty', element: <LoyaltyPage /> },

@@ -14,6 +14,7 @@ import DataTable, { type Column } from '@/components/shared/DataTable'
 import PageHeader from '@/components/shared/PageHeader'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import ImageUpload from '@/components/shared/ImageUpload'
+import { MatchCombobox } from '@/components/shared/MatchCombobox'
 import { useToast } from '@/hooks/use-toast'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
@@ -206,7 +207,13 @@ export default function HighlightsPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 space-y-4">
               <FormField control={form.control} name="match_id" render={({ field }) => (
-                <FormItem><FormLabel>Match ID</FormLabel><FormControl><Input placeholder="Match UUID..." {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem>
+                  <FormLabel>Match</FormLabel>
+                  <FormControl>
+                    <MatchCombobox value={field.value} onChange={field.onChange} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )} />
               <FormField control={form.control} name="sport_id" render={({ field }) => (
                 <FormItem>

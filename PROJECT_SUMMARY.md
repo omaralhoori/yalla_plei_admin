@@ -120,11 +120,12 @@ yalla-plei-admin/
 - [x] **Teams** — Full CRUD with paginated list and logo upload
 - [x] **Pitches** — Full CRUD + **search bar** + **surface_type dropdown filter** + service assignment
 - [x] **Services** — Full CRUD for pitch amenities
-- [x] **Matches** — Uses `/admin/matches` (all statuses) + **date-range pickers** + **pitch filter** + **status filter** + per-match services checklist pre-populated from pitch defaults (local ↔ UTC timezone conversion)
+- [x] **Matches** — Uses `/admin/matches` (all statuses) + **date-range pickers** + **pitch filter** + **status filter** + per-match services checklist pre-populated from pitch defaults (local ↔ UTC timezone conversion); correct UTC date/time payload format (`YYYY-MM-DD` + `HH:MM:SS`); sport→pitch dependent dropdown
+- [x] **Match Detail** (`/matches/:id`) — Match info card (date/time local, pitch, sport, format, price, policy, status), capacity stats (booked/available/total slots), registered players table from `/admin/bookings?match_id`, "Add Highlight" button opens pre-filled highlight Sheet with match_id hidden
 - [x] **Bookings** — Paginated admin view (`GET /admin/bookings`), status + match_id filters, Force Cancel with refund toggle (`POST /admin/bookings/:id/cancel`)
 - [x] **Financials** — Filterable transactions (status/source/user_id/date range), user_id pre-filter via URL query param, manual refund with 2-step confirmation (JOD currency), CSV export
 - [x] **Loyalty** — Tabbed: Levels CRUD (409 overlap error shown inline) + Rewards CRUD (image upload, required points)
-- [x] **Highlights** — Full CRUD (`/admin/highlights`): media URL + thumbnail ImageUpload + show period (show_from/show_to)
+- [x] **Highlights** — Full CRUD (`/admin/highlights`): media URL + thumbnail ImageUpload + show period; `match_id` uses searchable **MatchCombobox** (filters by pitch/date/sport client-side) instead of raw UUID input
 - [x] **Settings** — Tabbed layout with full cancellation policy CRUD; extensible placeholder tabs
 
 ### Shared Components
@@ -134,6 +135,7 @@ yalla-plei-admin/
 - [x] `PageHeader` — consistent page title + action slot pattern
 - [x] `StatusBadge` — mapped color badges for all status values
 - [x] `RequireAdmin` — renders children only when `role === 'admin'`; accepts optional `fallback`
+- [x] `MatchCombobox` — searchable match selector (Radix Popover + client-side filter); used in Highlights creation form
 
 ### UI/UX
 - [x] **Dark mode** — `ThemeContext` with `localStorage` persistence; toggles `dark` class on `<html>` (Tailwind `darkMode: ['class']`); toggle button in Header

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, XCircle, RefreshCw } from 'lucide-react'
+import { Plus, Pencil, XCircle, RefreshCw, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -18,7 +19,11 @@ import StatusBadge from '@/components/shared/StatusBadge'
 import { useToast } from '@/hooks/use-toast'
 import { usePagination } from '@/hooks/usePagination'
 import { api } from '@/lib/api'
-import { formatCurrency, formatDateTime, localDateTimeToUtc, utcToLocalDate, utcToLocalTime } from '@/lib/utils'
+import {
+  formatCurrency, formatDateTime,
+  matchApiToUtcIso, localToUtcMatchParts,
+  utcToLocalDate, utcToLocalTime,
+} from '@/lib/utils'
 import type { ApiResponse, PaginatedResponse, Match, MatchPayload, Sport, Pitch, CancellationPolicy } from '@/types/api'
 
 const FORMATS = ['5v5', '6v6', '7v7', '8v8', '11v11']
@@ -35,17 +40,9 @@ const matchSchema = z.object({
 
 type MatchFormValues = z.infer<typeof matchSchema>
 
-// Normalise API date + time strings to a full UTC ISO string
-function toUtcIso(date: string, time: string): string {
-  const d = (date ?? '').split('T')[0]
-  const t = (time ?? '').includes('T')
-    ? time.split('T')[1].replace('Z', '')
-    : (time ?? '').replace('Z', '')
-  return `${d}T${t || '00:00:00'}Z`
-}
-
 export default function MatchesPage() {
   const qc = useQueryClient()
+  const navigate = useNavigate()
   const { toast } = useToast()
   const { offset, limit, goToNextPage, goToPrevPage, reset } = usePagination(20)
 
@@ -54,7 +51,7 @@ export default function MatchesPage() {
   const [cancelTarget, setCancelTarget] = useState<Match | null>(null)
   const [matchServiceIds, setMatchServiceIds] = useState<string[]>([])
 
-  // Filter state — "draft" while editing, "applied" on submit
+  // Filter bar state
   const [sportFilter, setSportFilter] = useState('')
   const [pitchFilter, setPitchFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -64,7 +61,7 @@ export default function MatchesPage() {
     sport_id: '', pitch_id: '', status: '', date_from: '', date_to: '',
   })
 
-  // ─── Queries ────────────────────────────────────────────────────────────────
+  // ─── Queries ──────────────────────────────────────────────────────────────────
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-matches', offset, limit, applied],
@@ -85,7 +82,8 @@ export default function MatchesPage() {
     queryFn: async () => (await api.get<ApiResponse<Sport[]>>('/sports')).data.data,
   })
 
-  const { data: pitches = [] } = useQuery({
+  // All pitches for the filter bar
+  const { data: allPitches = [] } = useQuery({
     queryKey: ['pitches'],
     queryFn: async () => (await api.get<ApiResponse<Pitch[]>>('/pitches')).data.data,
   })
@@ -95,7 +93,7 @@ export default function MatchesPage() {
     queryFn: async () => (await api.get<ApiResponse<CancellationPolicy[]>>('/admin/policies')).data.data,
   })
 
-  // ─── Form ────────────────────────────────────────────────────────────────────
+  // ─── Form ─────────────────────────────────────────────────────────────────────
 
   const form = useForm<MatchFormValues>({
     resolver: zodResolver(matchSchema),
@@ -105,19 +103,31 @@ export default function MatchesPage() {
     },
   })
 
-  // When pitch selection changes, auto-populate services checklist from pitch defaults
+  // Watch sport_id to filter pitches in the form dropdown
+  const selectedSportId = form.watch('sport_id')
   const watchedPitchId = form.watch('pitch_id')
 
+  // Pitches filtered by the selected sport — only fetched when a sport is selected
+  const { data: formPitches = [] } = useQuery({
+    queryKey: ['pitches', { sport_id: selectedSportId }],
+    queryFn: async () => {
+      const res = await api.get<ApiResponse<Pitch[]>>(`/pitches?sport_id=${selectedSportId}`)
+      return res.data.data
+    },
+    enabled: !!selectedSportId,
+  })
+
+  // Auto-populate services checklist from the selected pitch's defaults
   useEffect(() => {
     if (watchedPitchId) {
-      const pitch = pitches.find(p => p.id === watchedPitchId)
+      const pitch = formPitches.find(p => p.id === watchedPitchId)
       setMatchServiceIds(pitch?.services?.map(s => s.id) ?? [])
     } else {
       setMatchServiceIds([])
     }
-  }, [watchedPitchId, pitches])
+  }, [watchedPitchId, formPitches])
 
-  // ─── Mutations ───────────────────────────────────────────────────────────────
+  // ─── Mutations ────────────────────────────────────────────────────────────────
 
   const createMutation = useMutation({
     mutationFn: (payload: MatchPayload) => api.post('/admin/matches', payload),
@@ -150,39 +160,42 @@ export default function MatchesPage() {
     onError: () => toast({ title: 'Failed to cancel match', variant: 'destructive' }),
   })
 
-  // ─── Handlers ────────────────────────────────────────────────────────────────
+  // ─── Handlers ─────────────────────────────────────────────────────────────────
 
   function openCreate() {
     setEditTarget(null)
-    form.reset({
-      sport_id: '', pitch_id: '', date: '', time: '',
-      players_format: '', join_price: 0, cancellation_policy_id: '',
-    })
+    form.reset({ sport_id: '', pitch_id: '', date: '', time: '', players_format: '', join_price: 0, cancellation_policy_id: '' })
     setMatchServiceIds([])
     setSheetOpen(true)
   }
 
   function openEdit(match: Match) {
     setEditTarget(match)
-    const iso = toUtcIso(match.date ?? '', match.time ?? '')
+    const iso = matchApiToUtcIso(match.date ?? '', match.time ?? '')
     form.reset({
       sport_id: match.sport_id,
       pitch_id: match.pitch_id,
-      date: utcToLocalDate(iso),
-      time: utcToLocalTime(iso),
+      date: iso ? utcToLocalDate(iso) : '',
+      time: iso ? utcToLocalTime(iso) : '',
       players_format: match.players_format,
       join_price: match.join_price,
       cancellation_policy_id: match.cancellation_policy_id ?? '',
     })
-    // effect handles matchServiceIds via watchedPitchId change
     setSheetOpen(true)
   }
 
   function onSubmit(values: MatchFormValues) {
+    // Convert local date + time inputs to the UTC date (YYYY-MM-DD) and time (HH:MM:SS)
+    // parts that the Match API expects — NOT full ISO strings.
+    const { date: utcDate, time: utcTime } = localToUtcMatchParts(values.date, values.time)
     const payload: MatchPayload = {
-      ...values,
-      date: localDateTimeToUtc(values.date, '00:00'),
-      time: localDateTimeToUtc(values.date, values.time),
+      sport_id: values.sport_id,
+      pitch_id: values.pitch_id,
+      date: utcDate,
+      time: utcTime,
+      players_format: values.players_format,
+      join_price: values.join_price,
+      cancellation_policy_id: values.cancellation_policy_id,
       status: 'active',
       service_ids: matchServiceIds.length > 0 ? matchServiceIds : undefined,
     }
@@ -192,34 +205,26 @@ export default function MatchesPage() {
 
   function applyFilters() {
     reset()
-    setApplied({
-      sport_id: sportFilter,
-      pitch_id: pitchFilter,
-      status: statusFilter,
-      date_from: dateFrom,
-      date_to: dateTo,
-    })
+    setApplied({ sport_id: sportFilter, pitch_id: pitchFilter, status: statusFilter, date_from: dateFrom, date_to: dateTo })
   }
 
   function toggleMatchService(id: string) {
-    setMatchServiceIds(prev =>
-      prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]
-    )
+    setMatchServiceIds(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id])
   }
 
   const isBusy = createMutation.isPending || updateMutation.isPending
-  const selectedPitch = pitches.find(p => p.id === watchedPitchId) ?? null
+  const selectedPitch = formPitches.find(p => p.id === watchedPitchId) ?? null
   const pitchServices = selectedPitch?.services ?? []
 
-  // ─── Table columns ───────────────────────────────────────────────────────────
+  // ─── Table columns ────────────────────────────────────────────────────────────
 
   const columns: Column<Match>[] = [
     {
       key: 'datetime',
       header: 'Date / Time (Local)',
       cell: row => {
-        const iso = toUtcIso(row.date ?? '', row.time ?? '')
-        return <span className="text-sm">{formatDateTime(iso)}</span>
+        const iso = matchApiToUtcIso(row.date ?? '', row.time ?? '')
+        return <span className="text-sm">{iso ? formatDateTime(iso) : '—'}</span>
       },
     },
     {
@@ -252,18 +257,13 @@ export default function MatchesPage() {
       header: '',
       cell: row => (
         <div className="flex gap-2 justify-end">
-          <Button
-            size="sm" variant="outline"
-            onClick={() => openEdit(row)}
-            disabled={row.status === 'cancelled'}
-          >
+          <Button size="sm" variant="outline" onClick={() => navigate(`/matches/${row.id}`)}>
+            <Eye className="w-3.5 h-3.5" />
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => openEdit(row)} disabled={row.status === 'cancelled'}>
             <Pencil className="w-3.5 h-3.5" />
           </Button>
-          <Button
-            size="sm" variant="outline" className="text-destructive"
-            onClick={() => setCancelTarget(row)}
-            disabled={row.status === 'cancelled'}
-          >
+          <Button size="sm" variant="outline" className="text-destructive" onClick={() => setCancelTarget(row)} disabled={row.status === 'cancelled'}>
             <XCircle className="w-3.5 h-3.5" />
           </Button>
         </div>
@@ -280,7 +280,7 @@ export default function MatchesPage() {
       />
 
       {/* Filter bar */}
-      <div className="bg-white border rounded-lg p-4 mb-4 flex flex-wrap gap-3 items-end">
+      <div className="bg-card border rounded-lg p-4 mb-4 flex flex-wrap gap-3 items-end">
         <div className="space-y-1">
           <Label>Sport</Label>
           <Select value={sportFilter} onValueChange={v => setSportFilter(v === 'all' ? '' : v)}>
@@ -297,7 +297,7 @@ export default function MatchesPage() {
             <SelectTrigger className="w-44"><SelectValue placeholder="All pitches" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All pitches</SelectItem>
-              {pitches.map(p => <SelectItem key={p.id} value={p.id}>{p.name_en}</SelectItem>)}
+              {allPitches.map(p => <SelectItem key={p.id} value={p.id}>{p.name_en}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
@@ -308,6 +308,7 @@ export default function MatchesPage() {
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
@@ -347,10 +348,18 @@ export default function MatchesPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 space-y-4">
 
+              {/* Sport — clearing pitch when sport changes */}
               <FormField control={form.control} name="sport_id" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Sport</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select
+                    onValueChange={v => {
+                      field.onChange(v)
+                      form.setValue('pitch_id', '')
+                      setMatchServiceIds([])
+                    }}
+                    value={field.value}
+                  >
                     <FormControl><SelectTrigger><SelectValue placeholder="Select sport" /></SelectTrigger></FormControl>
                     <SelectContent>
                       {sports.map(s => <SelectItem key={s.id} value={s.id}>{s.name_en}</SelectItem>)}
@@ -360,13 +369,25 @@ export default function MatchesPage() {
                 </FormItem>
               )} />
 
+              {/* Pitch — filtered by selected sport, disabled until sport chosen */}
               <FormField control={form.control} name="pitch_id" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Pitch</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Select pitch" /></SelectTrigger></FormControl>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
+                    disabled={!selectedSportId}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={selectedSportId ? 'Select pitch' : 'Select a sport first'} />
+                      </SelectTrigger>
+                    </FormControl>
                     <SelectContent>
-                      {pitches.map(p => <SelectItem key={p.id} value={p.id}>{p.name_en}</SelectItem>)}
+                      {formPitches.length === 0
+                        ? <SelectItem value="_none" disabled>No pitches for this sport</SelectItem>
+                        : formPitches.map(p => <SelectItem key={p.id} value={p.id}>{p.name_en}</SelectItem>)
+                      }
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -380,7 +401,7 @@ export default function MatchesPage() {
                   <p className="text-xs text-muted-foreground -mt-1">
                     Pre-filled from pitch defaults. Toggle to override per-match.
                   </p>
-                  <div className="grid grid-cols-2 gap-2 p-3 border rounded-lg bg-slate-50">
+                  <div className="grid grid-cols-2 gap-2 p-3 border rounded-lg bg-muted/50">
                     {pitchServices.map(svc => (
                       <div key={svc.id} className="flex items-center gap-2">
                         <Checkbox
@@ -388,16 +409,14 @@ export default function MatchesPage() {
                           checked={matchServiceIds.includes(svc.id)}
                           onCheckedChange={() => toggleMatchService(svc.id)}
                         />
-                        <label htmlFor={`msvc-${svc.id}`} className="text-sm cursor-pointer">
-                          {svc.name_en}
-                        </label>
+                        <label htmlFor={`msvc-${svc.id}`} className="text-sm cursor-pointer">{svc.name_en}</label>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Date + Time displayed as local, stored as UTC */}
+              {/* Date + Time — local input, stored as UTC parts */}
               <div className="grid grid-cols-2 gap-3">
                 <FormField control={form.control} name="date" render={({ field }) => (
                   <FormItem>
@@ -468,7 +487,7 @@ export default function MatchesPage() {
       <ConfirmDialog
         open={!!cancelTarget}
         title="Cancel Match"
-        description={`Cancel this match? All confirmed bookings will be refunded to player wallets automatically.`}
+        description="Cancel this match? All confirmed bookings will be refunded to player wallets automatically."
         confirmLabel="Yes, Cancel Match"
         onConfirm={() => cancelTarget && cancelMutation.mutate(cancelTarget.id)}
         onCancel={() => setCancelTarget(null)}
