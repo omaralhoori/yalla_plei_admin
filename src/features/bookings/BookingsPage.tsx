@@ -14,12 +14,12 @@ import { useToast } from '@/hooks/use-toast'
 import { usePagination } from '@/hooks/usePagination'
 import { api } from '@/lib/api'
 import { formatCurrency, formatDateTime, formatDate } from '@/lib/utils'
-import type { ApiResponse, AdminBooking, CancelBookingPayload } from '@/types/api'
+import type { ApiResponse, PaginatedResponse, AdminBooking, CancelBookingPayload } from '@/types/api'
 
 export default function BookingsPage() {
   const qc = useQueryClient()
   const { toast } = useToast()
-  const { offset, limit, reset } = usePagination(20)
+  const { offset, limit, goToNextPage, goToPrevPage, reset } = usePagination(20)
 
   const [statusFilter, setStatusFilter] = useState('')
   const [matchIdFilter, setMatchIdFilter] = useState('')
@@ -34,7 +34,7 @@ export default function BookingsPage() {
       const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
       if (applied.status) params.set('status', applied.status)
       if (applied.match_id) params.set('match_id', applied.match_id)
-      const res = await api.get<ApiResponse<AdminBooking[]>>(`/admin/bookings?${params}`)
+      const res = await api.get<ApiResponse<PaginatedResponse<AdminBooking>>>(`/admin/bookings?${params}`)
       return res.data.data
     },
   })
@@ -55,19 +55,19 @@ export default function BookingsPage() {
     setApplied({ status: statusFilter, match_id: matchIdFilter })
   }
 
-  const bookings = Array.isArray(data) ? data : []
+  const bookings = data?.items ?? []
 
   const columns: Column<AdminBooking>[] = [
     {
-      key: 'user',
-      header: 'User',
+      key: 'player',
+      header: 'Player',
       cell: row => (
         <div>
-          <div className="font-medium text-sm">{row.user?.name ?? 'Unknown'}</div>
-          <div className="text-xs text-muted-foreground">{row.user?.email}</div>
+          <div className="font-medium text-sm">{row.player?.name ?? 'Unknown'}</div>
+          <div className="text-xs text-muted-foreground">{row.player?.email}</div>
         </div>
       ),
-      csvValue: row => row.user?.name ?? '',
+      csvValue: row => row.player?.name ?? '',
     },
     {
       key: 'match',
@@ -90,15 +90,15 @@ export default function BookingsPage() {
     },
     {
       key: 'amount',
-      header: 'Amount',
-      cell: row => <span className="font-semibold">{formatCurrency(row.amount_paid)}</span>,
-      csvValue: row => row.amount_paid,
+      header: 'Price / Slot',
+      cell: row => <span className="font-semibold">{formatCurrency(row.match?.join_price ?? 0)}</span>,
+      csvValue: row => row.match?.join_price ?? 0,
     },
     {
       key: 'date',
       header: 'Booked At',
-      cell: row => <span className="text-sm">{formatDateTime(row.created_at)}</span>,
-      csvValue: row => formatDateTime(row.created_at),
+      cell: row => <span className="text-sm">{formatDateTime(row.date_time)}</span>,
+      csvValue: row => formatDateTime(row.date_time),
     },
     {
       key: 'actions',
@@ -156,6 +156,12 @@ export default function BookingsPage() {
         columns={columns}
         data={bookings}
         isLoading={isLoading}
+        pagination={data ? {
+          total: data.meta.total_count,
+          limit,
+          offset,
+          onChange: o => o > offset ? goToNextPage() : goToPrevPage(),
+        } : undefined}
         emptyMessage="No bookings found for the selected filters."
         csvFilename="bookings"
       />
@@ -166,8 +172,8 @@ export default function BookingsPage() {
         description={
           <div className="space-y-3">
             <p>
-              Cancel booking for <strong>{cancelTarget?.user?.name}</strong>?
-              Paid: <strong>{formatCurrency(cancelTarget?.amount_paid ?? 0)}</strong>.
+              Cancel booking for <strong>{cancelTarget?.player?.name}</strong>?
+              Price: <strong>{formatCurrency(cancelTarget?.match?.join_price ?? 0)}</strong>.
             </p>
             <div className="flex items-center gap-3">
               <Switch

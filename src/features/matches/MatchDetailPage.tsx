@@ -22,7 +22,7 @@ import ImageUpload from '@/components/shared/ImageUpload'
 import { useToast } from '@/hooks/use-toast'
 import { api } from '@/lib/api'
 import { formatCurrency, formatDateTime, formatDate, matchApiToUtcIso } from '@/lib/utils'
-import type { ApiResponse, Match, AdminBooking, HighlightPayload, Sport } from '@/types/api'
+import type { ApiResponse, PaginatedResponse, Match, AdminBooking, HighlightPayload, Sport } from '@/types/api'
 
 // ─── Highlight form schema (match_id injected at submit time, not in form) ────
 
@@ -96,10 +96,10 @@ export default function MatchDetailPage() {
   const { data: bookings = [], isLoading: bookingsLoading } = useQuery({
     queryKey: ['match-bookings', id],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<AdminBooking[]>>(
+      const res = await api.get<ApiResponse<PaginatedResponse<AdminBooking>>>(
         `/admin/bookings?match_id=${id}&limit=100&offset=0`
       )
-      return Array.isArray(res.data.data) ? res.data.data : []
+      return res.data.data.items ?? []
     },
     enabled: !!id,
   })
@@ -180,8 +180,8 @@ export default function MatchDetailPage() {
       header: 'Player',
       cell: row => (
         <div>
-          <div className="font-medium text-sm">{row.user?.name ?? 'Unknown'}</div>
-          <div className="text-xs text-muted-foreground">{row.user?.email}</div>
+          <div className="font-medium text-sm">{row.player?.name ?? 'Unknown'}</div>
+          <div className="text-xs text-muted-foreground">{row.player?.email}</div>
         </div>
       ),
     },
@@ -192,13 +192,13 @@ export default function MatchDetailPage() {
     },
     {
       key: 'amount',
-      header: 'Amount Paid',
-      cell: row => <span className="font-semibold text-sm">{formatCurrency(row.amount_paid)}</span>,
+      header: 'Price / Slot',
+      cell: row => <span className="font-semibold text-sm">{formatCurrency(row.match?.join_price ?? match?.join_price ?? 0)}</span>,
     },
     {
       key: 'booked_at',
       header: 'Booked At',
-      cell: row => <span className="text-sm text-muted-foreground">{formatDateTime(row.created_at)}</span>,
+      cell: row => <span className="text-sm text-muted-foreground">{formatDateTime(row.date_time)}</span>,
     },
   ]
 

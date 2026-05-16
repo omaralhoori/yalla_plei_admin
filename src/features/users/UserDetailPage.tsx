@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast'
 import { api } from '@/lib/api'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
 import StatusBadge from '@/components/shared/StatusBadge'
-import type { ApiResponse, AdminUserDetail, AdjustPointsPayload, AdminBooking } from '@/types/api'
+import type { ApiResponse, PaginatedResponse, AdminUserDetail, AdjustPointsPayload, AdminBooking } from '@/types/api'
 
 const adjustPointsSchema = z.object({
   points: z.coerce
@@ -53,8 +53,8 @@ export default function UserDetailPage() {
   const { data: bookings = [], isLoading: bookingsLoading } = useQuery({
     queryKey: ['user-bookings', id],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<AdminBooking[]>>(`/admin/bookings?user_id=${id}&limit=10&offset=0`)
-      return Array.isArray(res.data.data) ? res.data.data : []
+      const res = await api.get<ApiResponse<PaginatedResponse<AdminBooking>>>(`/admin/bookings?user_id=${id}&limit=10&offset=0`)
+      return res.data.data.items ?? []
     },
     enabled: !!id,
   })
@@ -216,12 +216,12 @@ export default function UserDetailPage() {
                   <div>
                     <p className="text-sm font-medium">{b.match?.pitch?.name_en ?? 'Unknown Pitch'}</p>
                     <p className="text-xs text-muted-foreground">
-                      {b.match?.date ? formatDate(b.match.date) : '—'} · {formatDateTime(b.created_at)}
+                      {b.match?.date ? formatDate(b.match.date) : '—'} · {formatDateTime(b.date_time)}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
                     <StatusBadge status={b.status} />
-                    <span className="font-semibold text-sm">{formatCurrency(b.amount_paid)}</span>
+                    <span className="font-semibold text-sm">{formatCurrency(b.match?.join_price ?? 0)}</span>
                   </div>
                 </div>
               ))}

@@ -107,6 +107,34 @@ export default function MatchesPage() {
   const selectedSportId = form.watch('sport_id')
   const watchedPitchId = form.watch('pitch_id')
 
+  // Fresh single-match fetch for the edit form — uses the new admin detail endpoint
+  const { data: freshMatch } = useQuery({
+    queryKey: ['match-detail', editTarget?.id],
+    queryFn: async () => {
+      const res = await api.get<ApiResponse<Match>>(`/admin/matches/${editTarget!.id}`)
+      return res.data.data
+    },
+    enabled: !!editTarget?.id && sheetOpen,
+  })
+
+  // Repopulate the form once the fresh data arrives (handles ISO date/time from detail endpoint)
+  useEffect(() => {
+    if (!freshMatch) return
+    const iso = matchApiToUtcIso(freshMatch.date ?? '', freshMatch.time ?? '')
+    form.reset({
+      sport_id: freshMatch.sport_id,
+      pitch_id: freshMatch.pitch_id,
+      date: iso ? utcToLocalDate(iso) : '',
+      time: iso ? utcToLocalTime(iso) : '',
+      players_format: freshMatch.players_format,
+      join_price: freshMatch.join_price,
+      cancellation_policy_id: freshMatch.cancellation_policy_id ?? '',
+    })
+    if (freshMatch.pitch?.services) {
+      setMatchServiceIds(freshMatch.pitch.services.map(s => s.id))
+    }
+  }, [freshMatch])
+
   // Pitches filtered by the selected sport — only fetched when a sport is selected
   const { data: formPitches = [] } = useQuery({
     queryKey: ['pitches', { sport_id: selectedSportId }],

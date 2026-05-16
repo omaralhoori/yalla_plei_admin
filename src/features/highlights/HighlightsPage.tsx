@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -18,7 +18,7 @@ import { MatchCombobox } from '@/components/shared/MatchCombobox'
 import { useToast } from '@/hooks/use-toast'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
-import type { ApiResponse, Highlight, HighlightPayload, Sport } from '@/types/api'
+import type { ApiResponse, Highlight, HighlightPayload, Match, Sport } from '@/types/api'
 
 const highlightSchema = z.object({
   match_id: z.string().min(1, 'Match ID is required'),
@@ -63,6 +63,18 @@ export default function HighlightsPage() {
       description: '', date: '', show_from: '', show_to: '',
     },
   })
+
+  const watchedMatchId = form.watch('match_id')
+
+  // Auto-fill sport_id from the selected match (uses data already cached by MatchCombobox)
+  useEffect(() => {
+    if (!watchedMatchId) return
+    const cachedMatches = qc.getQueryData<Match[]>(['matches-combobox'])
+    const selectedMatch = cachedMatches?.find(m => m.id === watchedMatchId)
+    if (selectedMatch?.sport_id) {
+      form.setValue('sport_id', selectedMatch.sport_id, { shouldValidate: true })
+    }
+  }, [watchedMatchId, qc, form])
 
   const createMutation = useMutation({
     mutationFn: (payload: HighlightPayload) => api.post('/admin/highlights', payload),
@@ -216,14 +228,17 @@ export default function HighlightsPage() {
                 </FormItem>
               )} />
               <FormField control={form.control} name="sport_id" render={({ field }) => (
-                <FormItem>
+                <FormItem className={watchedMatchId ? 'opacity-60' : ''}>
                   <FormLabel>Sport</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={!!watchedMatchId}>
                     <FormControl><SelectTrigger><SelectValue placeholder="Select sport" /></SelectTrigger></FormControl>
                     <SelectContent>
                       {sports.map(s => <SelectItem key={s.id} value={s.id}>{s.name_en}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  {watchedMatchId && (
+                    <p className="text-xs text-muted-foreground">Auto-filled from selected match</p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )} />

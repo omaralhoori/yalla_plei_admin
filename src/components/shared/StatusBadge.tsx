@@ -7,6 +7,8 @@ const statusConfig = {
   pending: { label: 'Pending', variant: 'warning' as const },
   failed: { label: 'Failed', variant: 'destructive' as const },
   confirmed: { label: 'Confirmed', variant: 'success' as const },
+  pending_payment: { label: 'Pending Payment', variant: 'warning' as const },
+  waitlist: { label: 'Waitlist', variant: 'secondary' as const },
   true: { label: 'Yes', variant: 'success' as const },
   false: { label: 'No', variant: 'secondary' as const },
 } as const

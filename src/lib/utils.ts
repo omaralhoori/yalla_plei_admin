@@ -41,15 +41,23 @@ export function formatDateTime(utcStr: string | undefined | null): string {
   })
 }
 
-// Combine the API's separate date ("YYYY-MM-DD") and time ("HH:MM:SS") fields into
-// a proper UTC ISO string for display and form pre-population.
-// Strips trailing Z, milliseconds, and date prefixes from the time component.
+// Combine the API's separate date and time fields into a UTC ISO string for display
+// and form pre-population.
+// Handles all formats returned by the API:
+//   full ISO with offset: "2026-05-18T21:17:00+03:00"  → parsed directly
+//   full ISO with Z:      "2026-05-18T21:17:00Z"        → parsed directly
+//   bare time:            "HH:MM:SS"                    → combined with date
 export function matchApiToUtcIso(date: string, time: string): string {
   if (!date) return ''
-  const d = date.split('T')[0].trim()
-  const rawT = (time ?? '').split('T').pop()!
-  const t = rawT.replace(/Z$/i, '').replace(/\.\d+$/, '').trim() || '00:00:00'
-  return `${d}T${t}Z`
+  // time is already a full ISO datetime string — parse it (handles Z, +HH:MM, -HH:MM)
+  if (time && time.includes('T')) {
+    const d = new Date(time)
+    if (!isNaN(d.getTime())) return d.toISOString()
+  }
+  // Fallback for bare "HH:MM:SS" time strings
+  const datePart = date.split('T')[0].trim()
+  const t = (time ?? '').replace(/Z$/i, '').replace(/\.\d+$/, '').trim() || '00:00:00'
+  return `${datePart}T${t}Z`
 }
 
 // Converts local YYYY-MM-DD + HH:MM form inputs → UTC ISO string for API submission
@@ -57,14 +65,15 @@ export function localDateTimeToUtc(localDate: string, localTime: string): string
   return new Date(`${localDate}T${localTime}:00`).toISOString()
 }
 
-// Converts local date + time form inputs into the UTC date + time parts the Match API expects:
-//   date → "YYYY-MM-DD" (UTC)
-//   time → "HH:MM:SS"   (UTC)
+// Converts local date + time form inputs into the UTC ISO strings the Match API expects:
+//   date → "YYYY-MM-DDT00:00:00Z" (calendar date at UTC midnight)
+//   time → "YYYY-MM-DDT19:00:00Z" (full UTC datetime of the match start)
 export function localToUtcMatchParts(localDate: string, localTime: string): { date: string; time: string } {
   const utcIso = new Date(`${localDate}T${localTime}:00`).toISOString()
+  const datePart = utcIso.split('T')[0]
   return {
-    date: utcIso.split('T')[0],
-    time: utcIso.split('T')[1].replace(/\.\d+Z$/, ''),
+    date: `${datePart}T00:00:00Z`,
+    time: utcIso.replace(/\.\d+Z$/, 'Z'),
   }
 }
 

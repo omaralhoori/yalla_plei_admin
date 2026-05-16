@@ -305,23 +305,28 @@ export interface RewardPayload {
 
 // ─── Booking ──────────────────────────────────────────────────────────────────
 
-export type BookingStatus = 'confirmed' | 'cancelled' | 'pending' | 'completed'
+export type BookingStatus = 'confirmed' | 'cancelled' | 'pending' | 'completed' | 'pending_payment' | 'waitlist'
 
 export interface AdminBooking {
   id: string
-  user_id: string
+  player_id: string
   match_id: string
+  pitch_id?: string
   status: BookingStatus
-  payment_status: string
-  amount_paid: number
-  created_at: string
-  user?: { id: string; name: string; email: string; phone?: string }
+  date_time?: string
+  goals_count?: number
+  assists_count?: number
+  is_mvp?: boolean
+  attended?: boolean
+  points_earned?: number
+  player?: { id: string; name: string; email: string; phone?: string }
   match?: {
     id: string
     date: string
-    time: string
-    pitch?: Pitch
+    time?: string
+    join_price?: number
     sport?: Sport
+    pitch?: Pitch
   }
 }
 
