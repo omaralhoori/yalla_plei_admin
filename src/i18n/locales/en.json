@@ -1,0 +1,22 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "users": "Users",
+    "sports": "Sports",
+    "teams": "Teams",
+    "pitches": "Pitches",
+    "services": "Services",
+    "matches": "Matches",
+    "bookings": "Bookings",
+    "financials": "Financials",
+    "loyalty": "Loyalty",
+    "highlights": "Highlights",
+    "settings": "Settings"
+  },
+  "header": {
+    "signOut": "Sign out",
+    "darkMode": "Dark mode",
+    "lightMode": "Light mode",
+    "language": "Language"
+  }
+}

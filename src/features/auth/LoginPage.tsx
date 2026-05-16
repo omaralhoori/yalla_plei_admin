@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { api } from '@/lib/api'
-import { setToken, isAdmin, clearToken } from '@/hooks/useAuth'
+import { setToken, setRefreshToken, isAdmin, clearAllTokens } from '@/hooks/useAuth'
 import type { ApiResponse, LoginResponse } from '@/types/api'
 
 const loginSchema = z.object({
@@ -34,11 +34,12 @@ export default function LoginPage() {
     setAuthError(null)
     try {
       const res = await api.post<ApiResponse<LoginResponse>>('/auth/login', values)
-      const { token } = res.data.data
-      setToken(token)
+      const { access_token, refresh_token } = res.data.data
+      setToken(access_token)
+      setRefreshToken(refresh_token)
 
       if (!isAdmin()) {
-        clearToken()
+        clearAllTokens()
         setAuthError('Access denied. Admin or Manager role required.')
         return
       }

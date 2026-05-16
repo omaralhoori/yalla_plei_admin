@@ -1,4 +1,4 @@
-import { TOKEN_KEY } from '@/lib/api'
+import { TOKEN_KEY, REFRESH_TOKEN_KEY } from '@/lib/api'
 
 interface JwtPayload {
   id: string
@@ -29,6 +29,23 @@ export function setToken(token: string): void {
 
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY)
+}
+
+export function getRefreshToken(): string | null {
+  return localStorage.getItem(REFRESH_TOKEN_KEY)
+}
+
+export function setRefreshToken(token: string): void {
+  localStorage.setItem(REFRESH_TOKEN_KEY, token)
+}
+
+export function clearRefreshToken(): void {
+  localStorage.removeItem(REFRESH_TOKEN_KEY)
+}
+
+export function clearAllTokens(): void {
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(REFRESH_TOKEN_KEY)
 }
 
 export function getUser(): JwtPayload | null {

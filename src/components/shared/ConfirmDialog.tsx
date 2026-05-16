@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogContent, DialogDescription,
@@ -7,7 +8,7 @@ import {
 interface ConfirmDialogProps {
   open: boolean
   title: string
-  description: string
+  description: ReactNode
   confirmLabel?: string
   variant?: 'destructive' | 'default'
   isLoading?: boolean

@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom'
-import { isAuthenticated, isAdmin, clearToken } from '@/hooks/useAuth'
+import { isAuthenticated, isAdmin, clearAllTokens } from '@/hooks/useAuth'
 import AppLayout from '@/components/layout/AppLayout'
 
 const LoginPage = lazy(() => import('@/features/auth/LoginPage'))
@@ -10,18 +10,20 @@ const TeamsPage = lazy(() => import('@/features/sports/TeamsPage'))
 const PitchesPage = lazy(() => import('@/features/pitches/PitchesPage'))
 const ServicesPage = lazy(() => import('@/features/pitches/ServicesPage'))
 const MatchesPage = lazy(() => import('@/features/matches/MatchesPage'))
+const BookingsPage = lazy(() => import('@/features/bookings/BookingsPage'))
 const FinancialsPage = lazy(() => import('@/features/financials/FinancialsPage'))
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'))
 const UsersPage = lazy(() => import('@/features/users/UsersPage'))
 const UserDetailPage = lazy(() => import('@/features/users/UserDetailPage'))
 const LoyaltyPage = lazy(() => import('@/features/loyalty/LoyaltyPage'))
+const HighlightsPage = lazy(() => import('@/features/highlights/HighlightsPage'))
 
 function ProtectedRoute() {
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />
   }
   if (!isAdmin()) {
-    clearToken()
+    clearAllTokens()
     return <Navigate to="/login" replace />
   }
   return (
@@ -57,8 +59,10 @@ export const router = createBrowserRouter([
       { path: '/pitches', element: <PitchesPage /> },
       { path: '/services', element: <ServicesPage /> },
       { path: '/matches', element: <MatchesPage /> },
+      { path: '/bookings', element: <BookingsPage /> },
       { path: '/financials', element: <FinancialsPage /> },
       { path: '/loyalty', element: <LoyaltyPage /> },
+      { path: '/highlights', element: <HighlightsPage /> },
       { path: '/settings', element: <SettingsPage /> },
     ],
   },

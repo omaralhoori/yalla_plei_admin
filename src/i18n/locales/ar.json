@@ -1,0 +1,22 @@
+{
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "users": "المستخدمون",
+    "sports": "الرياضات",
+    "teams": "الفرق",
+    "pitches": "الملاعب",
+    "services": "الخدمات",
+    "matches": "المباريات",
+    "bookings": "الحجوزات",
+    "financials": "المالية",
+    "loyalty": "الولاء",
+    "highlights": "الأبرز",
+    "settings": "الإعدادات"
+  },
+  "header": {
+    "signOut": "تسجيل الخروج",
+    "darkMode": "الوضع الداكن",
+    "lightMode": "الوضع الفاتح",
+    "language": "اللغة"
+  }
+}

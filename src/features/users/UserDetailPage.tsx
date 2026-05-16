@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { ArrowLeft, Target, Trophy, Users, Star, Sword } from 'lucide-react'
+import { ArrowLeft, Target, Trophy, Users, Star, Sword, Wallet, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -14,8 +14,9 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/hooks/use-toast'
 import { api } from '@/lib/api'
-import { formatDate } from '@/lib/utils'
-import type { ApiResponse, AdminUserDetail, AdjustPointsPayload } from '@/types/api'
+import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
+import StatusBadge from '@/components/shared/StatusBadge'
+import type { ApiResponse, AdminUserDetail, AdjustPointsPayload, AdminBooking } from '@/types/api'
 
 const adjustPointsSchema = z.object({
   points: z.coerce
@@ -45,6 +46,15 @@ export default function UserDetailPage() {
     queryFn: async () => {
       const res = await api.get<ApiResponse<AdminUserDetail>>(`/admin/users/${id}`)
       return res.data.data
+    },
+    enabled: !!id,
+  })
+
+  const { data: bookings = [], isLoading: bookingsLoading } = useQuery({
+    queryKey: ['user-bookings', id],
+    queryFn: async () => {
+      const res = await api.get<ApiResponse<AdminBooking[]>>(`/admin/bookings?user_id=${id}&limit=10&offset=0`)
+      return Array.isArray(res.data.data) ? res.data.data : []
     },
     enabled: !!id,
   })
@@ -132,10 +142,11 @@ export default function UserDetailPage() {
       </Card>
 
       {/* Stats row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatCard icon={Trophy} label="Total Points" value={isLoading ? null : String(data?.total_points ?? 0)} color="text-amber-600" bg="bg-amber-50" />
+        <StatCard icon={Wallet} label="Wallet" value={isLoading ? null : formatCurrency(data?.wallet_balance ?? 0)} color="text-emerald-600" bg="bg-emerald-50" />
         <StatCard icon={Users} label="Matches" value={isLoading ? null : String(stats?.total_matches ?? 0)} color="text-blue-600" bg="bg-blue-50" />
-        <StatCard icon={Sword} label="Goals" value={isLoading ? null : String(stats?.total_goals ?? 0)} color="text-emerald-600" bg="bg-emerald-50" />
+        <StatCard icon={Sword} label="Goals" value={isLoading ? null : String(stats?.total_goals ?? 0)} color="text-violet-600" bg="bg-violet-50" />
         <StatCard icon={Target} label="Assists" value={isLoading ? null : String(stats?.total_assists ?? 0)} color="text-purple-600" bg="bg-purple-50" />
         <StatCard icon={Star} label="MVPs" value={isLoading ? null : String(stats?.total_mvps ?? 0)} color="text-rose-600" bg="bg-rose-50" />
       </div>
@@ -172,6 +183,49 @@ export default function UserDetailPage() {
             </div>
           ) : (
             <p className="text-muted-foreground text-sm">No player profiles configured yet.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Bookings */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-base">Recent Bookings</CardTitle>
+            <CardDescription>Last 10 bookings by this user</CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => navigate(`/financials?user_id=${id}`)}
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            View Transactions
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {bookingsLoading ? (
+            <div className="space-y-2">{[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}</div>
+          ) : bookings.length === 0 ? (
+            <p className="text-muted-foreground text-sm">No bookings found for this user.</p>
+          ) : (
+            <div className="divide-y">
+              {bookings.map(b => (
+                <div key={b.id} className="py-3 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium">{b.match?.pitch?.name_en ?? 'Unknown Pitch'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {b.match?.date ? formatDate(b.match.date) : '—'} · {formatDateTime(b.created_at)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <StatusBadge status={b.status} />
+                    <span className="font-semibold text-sm">{formatCurrency(b.amount_paid)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>
@@ -248,7 +302,7 @@ function StatCard({ icon: Icon, label, value, color, bg }: StatCardProps) {
             <p className="text-xs text-muted-foreground">{label}</p>
             {value === null
               ? <Skeleton className="h-5 w-10 mt-0.5" />
-              : <p className="font-bold text-lg leading-none mt-0.5">{value}</p>}
+              : <p className="font-bold text-sm leading-none mt-0.5">{value}</p>}
           </div>
         </div>
       </CardContent>

@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { format, subDays } from 'date-fns'
-import { RefreshCw, DollarSign } from 'lucide-react'
+import { RefreshCw, DollarSign, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -32,11 +33,23 @@ type RefundFormValues = z.infer<typeof refundSchema>
 export default function FinancialsPage() {
   const { toast } = useToast()
   const { offset, limit, reset } = usePagination(20)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const initialUserId = searchParams.get('user_id') ?? ''
+
   const [statusFilter, setStatusFilter] = useState('')
   const [sourceFilter, setSourceFilter] = useState('')
+  const [userIdFilter, setUserIdFilter] = useState(initialUserId)
   const [fromDate, setFromDate] = useState(format(subDays(new Date(), 30), 'yyyy-MM-dd'))
   const [toDate, setToDate] = useState(format(new Date(), 'yyyy-MM-dd'))
-  const [appliedFilters, setAppliedFilters] = useState({ status: '', source: '', from: fromDate, to: toDate })
+  const [appliedFilters, setAppliedFilters] = useState({
+    status: '',
+    source: '',
+    user_id: initialUserId,
+    from: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
+    to: format(new Date(), 'yyyy-MM-dd'),
+  })
+
   const [refundTarget, setRefundTarget] = useState<FinancialTransaction | null>(null)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingRefund, setPendingRefund] = useState<RefundFormValues | null>(null)
@@ -47,6 +60,7 @@ export default function FinancialsPage() {
       const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
       if (appliedFilters.status) params.set('status', appliedFilters.status)
       if (appliedFilters.source) params.set('source', appliedFilters.source)
+      if (appliedFilters.user_id) params.set('user_id', appliedFilters.user_id)
       if (appliedFilters.from) params.set('from', appliedFilters.from)
       if (appliedFilters.to) params.set('to', appliedFilters.to)
       const res = await api.get<ApiResponse<FinancialTransaction[]>>(`/admin/transactions?${params}`)
@@ -82,7 +96,17 @@ export default function FinancialsPage() {
 
   function applyFilters() {
     reset()
-    setAppliedFilters({ status: statusFilter, source: sourceFilter, from: fromDate, to: toDate })
+    setAppliedFilters({ status: statusFilter, source: sourceFilter, user_id: userIdFilter, from: fromDate, to: toDate })
+    if (userIdFilter) searchParams.set('user_id', userIdFilter)
+    else searchParams.delete('user_id')
+    setSearchParams(searchParams, { replace: true })
+  }
+
+  function clearUserFilter() {
+    setUserIdFilter('')
+    setAppliedFilters(f => ({ ...f, user_id: '' }))
+    searchParams.delete('user_id')
+    setSearchParams(searchParams, { replace: true })
   }
 
   const transactions = Array.isArray(data) ? data : []
@@ -97,6 +121,7 @@ export default function FinancialsPage() {
           <div className="text-xs text-muted-foreground">{row.user?.email}</div>
         </div>
       ),
+      csvValue: row => row.user?.name ?? '',
     },
     {
       key: 'amount',
@@ -106,6 +131,7 @@ export default function FinancialsPage() {
           {formatCurrency(row.amount)}
         </span>
       ),
+      csvValue: row => row.amount,
     },
     {
       key: 'source',
@@ -113,10 +139,11 @@ export default function FinancialsPage() {
       cell: row => (
         <span className="capitalize">{row.source}{row.last_4_digits ? ` •••• ${row.last_4_digits}` : ''}</span>
       ),
+      csvValue: row => row.source,
     },
-    { key: 'status', header: 'Status', cell: row => <StatusBadge status={row.status} /> },
-    { key: 'date', header: 'Date', cell: row => <span className="text-sm">{formatDateTime(row.created_at)}</span> },
-    { key: 'txn_id', header: 'Transaction ID', cell: row => <code className="text-xs bg-muted px-1 py-0.5 rounded">{row.transaction_id}</code> },
+    { key: 'status', header: 'Status', cell: row => <StatusBadge status={row.status} />, csvValue: row => row.status },
+    { key: 'date', header: 'Date', cell: row => <span className="text-sm">{formatDateTime(row.created_at)}</span>, csvValue: row => formatDateTime(row.created_at) },
+    { key: 'txn_id', header: 'Transaction ID', cell: row => <code className="text-xs bg-muted px-1 py-0.5 rounded">{row.transaction_id}</code>, csvValue: row => row.transaction_id },
     {
       key: 'actions',
       header: '',
@@ -138,8 +165,17 @@ export default function FinancialsPage() {
     <div>
       <PageHeader title="Financials" subtitle="View transactions and issue manual refunds" />
 
+      {appliedFilters.user_id && (
+        <div className="mb-3 flex items-center gap-2 px-3 py-2 bg-primary/10 border border-primary/20 rounded-lg text-sm text-primary">
+          <span>Filtering by user ID: <strong>{appliedFilters.user_id}</strong></span>
+          <Button size="sm" variant="ghost" className="h-6 w-6 p-0 ml-auto" onClick={clearUserFilter}>
+            <X className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      )}
+
       {/* Filters */}
-      <div className="bg-white border rounded-lg p-4 mb-4 flex flex-wrap gap-3 items-end">
+      <div className="bg-card border rounded-lg p-4 mb-4 flex flex-wrap gap-3 items-end">
         <div className="space-y-1">
           <Label>Status</Label>
           <Select value={statusFilter} onValueChange={v => setStatusFilter(v === 'all' ? '' : v)}>
@@ -165,6 +201,16 @@ export default function FinancialsPage() {
           </Select>
         </div>
         <div className="space-y-1">
+          <Label>User ID</Label>
+          <Input
+            placeholder="Filter by user ID..."
+            value={userIdFilter}
+            onChange={e => setUserIdFilter(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && applyFilters()}
+            className="w-52"
+          />
+        </div>
+        <div className="space-y-1">
           <Label>From</Label>
           <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="w-40" />
         </div>
@@ -183,6 +229,7 @@ export default function FinancialsPage() {
         isLoading={isLoading}
         pagination={undefined}
         emptyMessage="No transactions found for the selected filters."
+        csvFilename="transactions"
       />
 
       {/* Manual Refund Dialog */}

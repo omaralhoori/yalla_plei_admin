@@ -31,7 +31,8 @@ export interface AuthUser {
 }
 
 export interface LoginResponse {
-  token: string
+  access_token: string
+  refresh_token: string
   user: AuthUser
 }
 
@@ -245,6 +246,7 @@ export interface AdminUserDetail {
   user: AdminUser
   player_profiles: PlayerProfile[]
   total_points: number
+  wallet_balance?: number
   stats: {
     total_goals: number
     total_assists: number
@@ -299,4 +301,57 @@ export interface RewardPayload {
   name_en: string
   image_url: string
   required_points: number
+}
+
+// ─── Booking ──────────────────────────────────────────────────────────────────
+
+export type BookingStatus = 'confirmed' | 'cancelled' | 'pending' | 'completed'
+
+export interface AdminBooking {
+  id: string
+  user_id: string
+  match_id: string
+  status: BookingStatus
+  payment_status: string
+  amount_paid: number
+  created_at: string
+  user?: { id: string; name: string; email: string; phone?: string }
+  match?: {
+    id: string
+    date: string
+    time: string
+    pitch?: Pitch
+    sport?: Sport
+  }
+}
+
+export interface CancelBookingPayload {
+  refund: boolean
+}
+
+// ─── Highlight ────────────────────────────────────────────────────────────────
+
+export interface Highlight {
+  id: string
+  match_id: string
+  sport_id: string
+  media_url: string
+  thumbnail_url?: string
+  description?: string
+  date: string
+  show_from?: string
+  show_to?: string
+  match?: { id: string; date: string; pitch?: Pitch }
+  sport?: Sport
+}
+
+export interface HighlightPayload {
+  match_id: string
+  sport_id: string
+  media_url: string
+  thumbnail_url?: string
+  description?: string
+  date: string
+  show_from?: string
+  show_to?: string
 }

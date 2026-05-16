@@ -37,7 +37,7 @@ export default function DashboardPage() {
 
   const chartData = summary
     ? [
-        { name: 'Revenue (SAR)', value: summary.total_revenue, fill: COLORS[0] },
+        { name: 'Revenue (JOD)', value: summary.total_revenue, fill: COLORS[0] },
         { name: 'Bookings', value: summary.total_bookings, fill: COLORS[1] },
         { name: 'New Users', value: summary.new_users, fill: COLORS[2] },
       ]
@@ -228,7 +228,7 @@ export default function DashboardPage() {
               {chartData.map(item => (
                 <div key={item.name} className="p-4 rounded-lg border bg-slate-50 text-center">
                   <div className="text-2xl font-bold" style={{ color: item.fill }}>
-                    {item.name === 'Revenue (SAR)' ? formatCurrency(item.value) : item.value}
+                    {item.name === 'Revenue (JOD)' ? formatCurrency(item.value) : item.value}
                   </div>
                   <div className="text-sm text-muted-foreground mt-1">{item.name}</div>
                 </div>
