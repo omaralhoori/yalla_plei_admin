@@ -2,7 +2,8 @@ import { TOKEN_KEY, REFRESH_TOKEN_KEY } from '@/lib/api'
 
 interface JwtPayload {
   id: string
-  name?: string
+  first_name?: string
+  last_name?: string
   email?: string
   role?: string
   exp?: number
