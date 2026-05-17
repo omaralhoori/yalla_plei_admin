@@ -63,12 +63,12 @@ export default function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="gap-2">
               <User className="w-4 h-4" />
-              <span className="hidden sm:inline text-sm">{user?.name ?? user?.email ?? 'Admin'}</span>
+              <span className="hidden sm:inline text-sm">{user ? `${user.first_name} ${user.last_name}`.trim() || user.email : 'Admin'}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuLabel className="font-normal">
-              <div className="text-sm font-medium">{user?.name ?? 'Admin'}</div>
+              <div className="text-sm font-medium">{user ? `${user.first_name} ${user.last_name}`.trim() || 'Admin' : 'Admin'}</div>
               <div className="text-xs text-muted-foreground">{user?.email}</div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />

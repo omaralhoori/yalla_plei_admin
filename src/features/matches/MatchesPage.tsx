@@ -33,6 +33,7 @@ const matchSchema = z.object({
   pitch_id: z.string().min(1, 'Pitch is required'),
   date: z.string().min(1, 'Date is required'),
   time: z.string().min(1, 'Time is required'),
+  duration: z.coerce.number().int('Must be a whole number').positive('Duration must be greater than 0'),
   players_format: z.string().min(1, 'Format is required'),
   join_price: z.coerce.number().positive('Price must be greater than 0'),
   cancellation_policy_id: z.string().min(1, 'Policy is required'),
@@ -98,7 +99,7 @@ export default function MatchesPage() {
   const form = useForm<MatchFormValues>({
     resolver: zodResolver(matchSchema),
     defaultValues: {
-      sport_id: '', pitch_id: '', date: '', time: '',
+      sport_id: '', pitch_id: '', date: '', time: '', duration: 90,
       players_format: '', join_price: 0, cancellation_policy_id: '',
     },
   })
@@ -126,6 +127,7 @@ export default function MatchesPage() {
       pitch_id: freshMatch.pitch_id,
       date: iso ? utcToLocalDate(iso) : '',
       time: iso ? utcToLocalTime(iso) : '',
+      duration: freshMatch.duration ?? 90,
       players_format: freshMatch.players_format,
       join_price: freshMatch.join_price,
       cancellation_policy_id: freshMatch.cancellation_policy_id ?? '',
@@ -192,7 +194,7 @@ export default function MatchesPage() {
 
   function openCreate() {
     setEditTarget(null)
-    form.reset({ sport_id: '', pitch_id: '', date: '', time: '', players_format: '', join_price: 0, cancellation_policy_id: '' })
+    form.reset({ sport_id: '', pitch_id: '', date: '', time: '', duration: 90, players_format: '', join_price: 0, cancellation_policy_id: '' })
     setMatchServiceIds([])
     setSheetOpen(true)
   }
@@ -205,6 +207,7 @@ export default function MatchesPage() {
       pitch_id: match.pitch_id,
       date: iso ? utcToLocalDate(iso) : '',
       time: iso ? utcToLocalTime(iso) : '',
+      duration: match.duration ?? 90,
       players_format: match.players_format,
       join_price: match.join_price,
       cancellation_policy_id: match.cancellation_policy_id ?? '',
@@ -221,6 +224,7 @@ export default function MatchesPage() {
       pitch_id: values.pitch_id,
       date: utcDate,
       time: utcTime,
+      duration: values.duration,
       players_format: values.players_format,
       join_price: values.join_price,
       cancellation_policy_id: values.cancellation_policy_id,
@@ -269,6 +273,11 @@ export default function MatchesPage() {
       key: 'format',
       header: 'Format',
       cell: row => <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{row.players_format}</code>,
+    },
+    {
+      key: 'duration',
+      header: 'Duration',
+      cell: row => <span className="text-sm text-muted-foreground">{row.duration ? `${row.duration} min` : '—'}</span>,
     },
     {
       key: 'price',
@@ -464,6 +473,16 @@ export default function MatchesPage() {
               <p className="text-xs text-muted-foreground -mt-2">
                 Times are entered in your browser's local timezone and submitted as UTC.
               </p>
+
+              <FormField control={form.control} name="duration" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Match Duration (minutes)</FormLabel>
+                  <FormControl>
+                    <Input type="number" min="1" step="1" placeholder="90" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
 
               <FormField control={form.control} name="players_format" render={({ field }) => (
                 <FormItem>

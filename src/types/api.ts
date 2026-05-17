@@ -23,7 +23,8 @@ export interface PaginatedResponse<T> {
 
 export interface AuthUser {
   id: string
-  name: string
+  first_name: string
+  last_name: string
   email: string
   phone?: string
   auth_provider: string
@@ -98,6 +99,7 @@ export interface Pitch {
   name_en: string
   sport_id: string
   image_url: string
+  city: string
   address: string
   google_maps_url: string
   surface_type: string
@@ -109,6 +111,7 @@ export interface PitchPayload {
   name_en: string
   sport_id: string
   image_url: string
+  city: string
   address: string
   google_maps_url: string
   surface_type: string
@@ -143,6 +146,7 @@ export interface Match {
   pitch_id: string
   date: string
   time: string
+  duration: number
   players_format: string
   join_price: number
   status?: MatchStatus
@@ -157,6 +161,7 @@ export interface MatchPayload {
   pitch_id: string
   date: string
   time: string
+  duration: number
   players_format: string
   join_price: number
   cancellation_policy_id: string
@@ -217,9 +222,12 @@ export interface UploadResponse {
 
 export interface AdminUser {
   id: string
-  name: string
+  first_name: string
+  last_name: string
   email: string
   phone: string
+  emergency_phone?: string
+  date_of_birth?: string
   role: 'player' | 'admin' | 'manager'
   gender: 'male' | 'female'
   auth_provider: string
@@ -256,7 +264,8 @@ export interface AdminUserDetail {
 }
 
 export interface CreateAdminUserPayload {
-  name: string
+  first_name: string
+  last_name: string
   email: string
   phone: string
   password: string
@@ -319,7 +328,7 @@ export interface AdminBooking {
   is_mvp?: boolean
   attended?: boolean
   points_earned?: number
-  player?: { id: string; name: string; email: string; phone?: string }
+  player?: { id: string; first_name: string; last_name: string; email: string; phone?: string }
   match?: {
     id: string
     date: string

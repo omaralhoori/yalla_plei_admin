@@ -21,11 +21,14 @@ import type { ApiResponse, Pitch, PitchPayload, Sport, Service } from '@/types/a
 
 const SURFACE_TYPES = ['artificial_grass', 'natural_grass', 'concrete', 'artificial']
 
+const CITIES = ['Amman', 'Zarqa', 'Irbid', 'Aqaba', 'Madaba', 'Ajloun', 'Karak']
+
 const pitchSchema = z.object({
   name_en: z.string().min(1, 'English name is required'),
   name_ar: z.string().min(1, 'Arabic name is required'),
   sport_id: z.string().min(1, 'Sport is required'),
   image_url: z.string().min(1, 'Image is required'),
+  city: z.string().min(1, 'City is required'),
   address: z.string().min(1, 'Address is required'),
   google_maps_url: z.string().url('Must be a valid URL'),
   surface_type: z.string().min(1, 'Surface type is required'),
@@ -76,7 +79,7 @@ export default function PitchesPage() {
 
   const form = useForm<PitchFormValues>({
     resolver: zodResolver(pitchSchema),
-    defaultValues: { name_en: '', name_ar: '', sport_id: '', image_url: '', address: '', google_maps_url: '', surface_type: '' },
+    defaultValues: { name_en: '', name_ar: '', sport_id: '', image_url: '', city: '', address: '', google_maps_url: '', surface_type: '' },
   })
 
   const savePitchAndServices = async (pitchId: string) => {
@@ -126,6 +129,7 @@ export default function PitchesPage() {
       name_ar: pitch.name_ar,
       sport_id: pitch.sport_id,
       image_url: pitch.image_url,
+      city: pitch.city,
       address: pitch.address,
       google_maps_url: pitch.google_maps_url,
       surface_type: pitch.surface_type,
@@ -155,6 +159,7 @@ export default function PitchesPage() {
         : <div className="w-10 h-10 rounded-md bg-muted" />,
     },
     { key: 'name_en', header: 'Name', cell: row => <span className="font-medium">{row.name_en}</span> },
+    { key: 'city', header: 'City', cell: row => <span className="text-sm">{row.city}</span> },
     { key: 'address', header: 'Address', cell: row => <span className="text-muted-foreground text-sm truncate max-w-[200px] block">{row.address}</span> },
     { key: 'surface_type', header: 'Surface', cell: row => <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{row.surface_type}</code> },
     {
@@ -242,6 +247,16 @@ export default function PitchesPage() {
               )} />
               <FormField control={form.control} name="image_url" render={({ field }) => (
                 <FormItem><FormLabel>Image</FormLabel><FormControl><ImageUpload value={field.value} onChange={field.onChange} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="city" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>City</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Select city" /></SelectTrigger></FormControl>
+                    <SelectContent>{CITIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
               )} />
               <FormField control={form.control} name="address" render={({ field }) => (
                 <FormItem><FormLabel>Address</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>

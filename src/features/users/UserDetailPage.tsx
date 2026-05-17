@@ -90,7 +90,7 @@ export default function UserDetailPage() {
           {isLoading ? (
             <Skeleton className="h-7 w-48" />
           ) : (
-            <h1 className="text-2xl font-bold">{user?.name}</h1>
+            <h1 className="text-2xl font-bold">{user?.first_name} {user?.last_name}</h1>
           )}
           <p className="text-muted-foreground text-sm">User Profile &amp; Statistics</p>
         </div>
@@ -111,8 +111,12 @@ export default function UserDetailPage() {
             </div>
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-4 text-sm">
+              <InfoRow label="First Name" value={user?.first_name} />
+              <InfoRow label="Last Name" value={user?.last_name} />
               <InfoRow label="Email" value={user?.email} />
               <InfoRow label="Phone" value={user?.phone} />
+              <InfoRow label="Emergency Phone" value={user?.emergency_phone} />
+              <InfoRow label="Date of Birth" value={user?.date_of_birth ? formatDate(user.date_of_birth) : undefined} />
               <InfoRow label="Gender" value={user?.gender} className="capitalize" />
               <InfoRow label="Auth Provider" value={user?.auth_provider} className="capitalize" />
               <InfoRow label="Joined" value={user?.created_at ? formatDate(user.created_at) : undefined} />

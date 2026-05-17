@@ -63,11 +63,11 @@ export default function BookingsPage() {
       header: 'Player',
       cell: row => (
         <div>
-          <div className="font-medium text-sm">{row.player?.name ?? 'Unknown'}</div>
+          <div className="font-medium text-sm">{row.player ? `${row.player.first_name} ${row.player.last_name}` : 'Unknown'}</div>
           <div className="text-xs text-muted-foreground">{row.player?.email}</div>
         </div>
       ),
-      csvValue: row => row.player?.name ?? '',
+      csvValue: row => row.player ? `${row.player.first_name} ${row.player.last_name}` : '',
     },
     {
       key: 'match',
@@ -172,7 +172,7 @@ export default function BookingsPage() {
         description={
           <div className="space-y-3">
             <p>
-              Cancel booking for <strong>{cancelTarget?.player?.name}</strong>?
+              Cancel booking for <strong>{cancelTarget?.player ? `${cancelTarget.player.first_name} ${cancelTarget.player.last_name}` : 'this player'}</strong>?
               Price: <strong>{formatCurrency(cancelTarget?.match?.join_price ?? 0)}</strong>.
             </p>
             <div className="flex items-center gap-3">

@@ -95,3 +95,12 @@ export function utcToLocalTime(utcStr: string): string {
     String(d.getMinutes()).padStart(2, '0'),
   ].join(':')
 }
+
+// Returns the local-timezone time string for a match's end, given its start UTC ISO and duration in minutes
+export function formatMatchEndTime(startUtcIso: string, durationMinutes: number): string {
+  if (!startUtcIso || !durationMinutes) return '—'
+  const d = new Date(startUtcIso)
+  if (isNaN(d.getTime())) return '—'
+  d.setMinutes(d.getMinutes() + durationMinutes)
+  return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+}

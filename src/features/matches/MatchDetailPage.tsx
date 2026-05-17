@@ -21,7 +21,7 @@ import StatusBadge from '@/components/shared/StatusBadge'
 import ImageUpload from '@/components/shared/ImageUpload'
 import { useToast } from '@/hooks/use-toast'
 import { api } from '@/lib/api'
-import { formatCurrency, formatDateTime, formatDate, matchApiToUtcIso } from '@/lib/utils'
+import { formatCurrency, formatDateTime, formatDate, matchApiToUtcIso, formatMatchEndTime } from '@/lib/utils'
 import type { ApiResponse, PaginatedResponse, Match, AdminBooking, HighlightPayload, Sport } from '@/types/api'
 
 // ─── Highlight form schema (match_id injected at submit time, not in form) ────
@@ -180,7 +180,7 @@ export default function MatchDetailPage() {
       header: 'Player',
       cell: row => (
         <div>
-          <div className="font-medium text-sm">{row.player?.name ?? 'Unknown'}</div>
+          <div className="font-medium text-sm">{row.player ? `${row.player.first_name} ${row.player.last_name}` : 'Unknown'}</div>
           <div className="text-xs text-muted-foreground">{row.player?.email}</div>
         </div>
       ),
@@ -234,7 +234,9 @@ export default function MatchDetailPage() {
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
             <InfoTile icon={Calendar} label="Date (local)" value={matchIso ? formatDate(matchIso) : '—'} loading={matchLoading} />
-            <InfoTile icon={Clock} label="Time (local)" value={matchIso ? formatDateTime(matchIso).split(',')[1]?.trim() : '—'} loading={matchLoading} />
+            <InfoTile icon={Clock} label="Start Time (local)" value={matchIso ? formatDateTime(matchIso).split(',')[1]?.trim() : '—'} loading={matchLoading} />
+            <InfoTile icon={Clock} label="End Time (local)" value={matchIso && match?.duration ? formatMatchEndTime(matchIso, match.duration) : '—'} loading={matchLoading} />
+            <InfoTile icon={BarChart3} label="Duration" value={match?.duration ? `${match.duration} min` : '—'} loading={matchLoading} />
             <InfoTile icon={MapPin} label="Pitch" value={match?.pitch?.name_en} loading={matchLoading} />
             <InfoTile icon={Users} label="Sport" value={match?.sport?.name_en} loading={matchLoading} />
             <InfoTile icon={BarChart3} label="Format" value={match?.players_format} loading={matchLoading} />

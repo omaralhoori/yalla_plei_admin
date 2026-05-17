@@ -21,7 +21,8 @@ import { formatDate } from '@/lib/utils'
 import type { ApiResponse, PaginatedResponse, AdminUser, CreateAdminUserPayload } from '@/types/api'
 
 const createUserSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
+  first_name: z.string().min(2, 'First name must be at least 2 characters'),
+  last_name: z.string().min(2, 'Last name must be at least 2 characters'),
   email: z.string().email('Valid email is required'),
   phone: z.string().min(7, 'Valid phone number is required'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
@@ -61,7 +62,7 @@ export default function UsersPage() {
 
   const form = useForm<CreateUserFormValues>({
     resolver: zodResolver(createUserSchema),
-    defaultValues: { name: '', email: '', phone: '', password: '', role: 'manager', gender: 'male' },
+    defaultValues: { first_name: '', last_name: '', email: '', phone: '', password: '', role: 'manager', gender: 'male' },
   })
 
   const createMutation = useMutation({
@@ -94,7 +95,7 @@ export default function UsersPage() {
       header: 'User',
       cell: row => (
         <div>
-          <div className="font-medium text-sm">{row.name}</div>
+          <div className="font-medium text-sm">{row.first_name} {row.last_name}</div>
           <div className="text-xs text-muted-foreground">{row.email}</div>
         </div>
       ),
@@ -210,9 +211,14 @@ export default function UsersPage() {
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-2">
-              <FormField control={form.control} name="name" render={({ field }) => (
-                <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
+              <div className="grid grid-cols-2 gap-3">
+                <FormField control={form.control} name="first_name" render={({ field }) => (
+                  <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="last_name" render={({ field }) => (
+                  <FormItem><FormLabel>Last Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+              </div>
               <FormField control={form.control} name="email" render={({ field }) => (
                 <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
