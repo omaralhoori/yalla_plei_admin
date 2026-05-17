@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { LogOut, User, Sun, Moon, Languages } from 'lucide-react'
+import { LogOut, User, Sun, Moon, Languages, Menu } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,15 +24,21 @@ const breadcrumbKeys: Record<string, string> = {
   '/settings': 'nav.settings',
 }
 
-export default function Header() {
+interface HeaderProps {
+  onMenuClick?: () => void
+}
+
+export default function Header({ onMenuClick }: HeaderProps) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { t, i18n } = useTranslation()
   const { theme, toggleTheme } = useTheme()
   const user = getUser()
-  // Match /matches/:id with a simple prefix check
+
   const breadcrumbKey = breadcrumbKeys[pathname]
-    ?? (pathname.startsWith('/matches/') ? 'nav.matches' : 'nav.dashboard')
+    ?? (pathname.startsWith('/matches/') ? 'nav.matches'
+      : pathname.startsWith('/users/') ? 'nav.users'
+      : 'nav.dashboard')
   const pageTitle = t(breadcrumbKey, { defaultValue: 'Admin' })
 
   function handleLogout() {
@@ -45,8 +51,18 @@ export default function Header() {
   }
 
   return (
-    <header className="h-16 border-b bg-background flex items-center justify-between px-6 shrink-0">
-      <div>
+    <header className="h-16 border-b bg-background flex items-center justify-between px-4 md:px-6 shrink-0">
+      <div className="flex items-center gap-3">
+        {/* Hamburger — only visible on mobile */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="md:hidden"
+          onClick={onMenuClick}
+          aria-label="Open navigation menu"
+        >
+          <Menu className="w-5 h-5" />
+        </Button>
         <h2 className="text-lg font-semibold">{pageTitle}</h2>
       </div>
 

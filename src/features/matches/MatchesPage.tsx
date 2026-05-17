@@ -454,7 +454,7 @@ export default function MatchesPage() {
               )}
 
               {/* Date + Time — local input, stored as UTC parts */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <FormField control={form.control} name="date" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Date (local)</FormLabel>
