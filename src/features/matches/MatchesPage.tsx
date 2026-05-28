@@ -544,10 +544,13 @@ export default function MatchesPage() {
               <FormField control={form.control} name="referee_id" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Assigned Referee (optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                  <Select
+                    onValueChange={v => field.onChange(v === '__none__' ? '' : v)}
+                    value={field.value || '__none__'}
+                  >
                     <FormControl><SelectTrigger><SelectValue placeholder="No referee" /></SelectTrigger></FormControl>
                     <SelectContent>
-                      <SelectItem value="">No referee</SelectItem>
+                      <SelectItem value="__none__">No referee</SelectItem>
                       {referees.map(r => (
                         <SelectItem key={r.id} value={r.id}>
                           {r.first_name} {r.last_name}
