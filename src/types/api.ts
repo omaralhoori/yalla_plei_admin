@@ -154,6 +154,8 @@ export interface Match {
   cancellation_policy?: CancellationPolicy
   sport?: Sport
   pitch?: Pitch
+  referee_id?: string
+  referee?: { id: string; first_name: string; last_name: string }
 }
 
 export interface MatchPayload {
@@ -167,6 +169,7 @@ export interface MatchPayload {
   cancellation_policy_id: string
   status?: MatchStatus
   service_ids?: string[]
+  referee_id?: string
 }
 
 // ─── Financial Transaction ───────────────────────────────────────────────────
@@ -228,7 +231,7 @@ export interface AdminUser {
   phone: string
   emergency_phone?: string
   date_of_birth?: string
-  role: 'player' | 'admin' | 'manager'
+  role: 'player' | 'admin' | 'manager' | 'referee'
   gender: 'male' | 'female'
   auth_provider: string
   is_phone_verified: boolean
@@ -269,7 +272,7 @@ export interface CreateAdminUserPayload {
   email: string
   phone: string
   password: string
-  role: 'player' | 'manager' | 'admin'
+  role: 'player' | 'manager' | 'admin' | 'referee'
   gender: 'male' | 'female'
 }
 

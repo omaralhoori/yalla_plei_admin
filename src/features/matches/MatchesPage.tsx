@@ -24,7 +24,7 @@ import {
   matchApiToUtcIso, localToUtcMatchParts,
   utcToLocalDate, utcToLocalTime,
 } from '@/lib/utils'
-import type { ApiResponse, PaginatedResponse, Match, MatchPayload, Sport, Pitch, CancellationPolicy } from '@/types/api'
+import type { ApiResponse, PaginatedResponse, Match, MatchPayload, Sport, Pitch, CancellationPolicy, AdminUser } from '@/types/api'
 
 const FORMATS = ['5v5', '6v6', '7v7', '8v8', '11v11']
 
@@ -37,6 +37,7 @@ const matchSchema = z.object({
   players_format: z.string().min(1, 'Format is required'),
   join_price: z.coerce.number().positive('Price must be greater than 0'),
   cancellation_policy_id: z.string().min(1, 'Policy is required'),
+  referee_id: z.string().optional(),
 })
 
 type MatchFormValues = z.infer<typeof matchSchema>
@@ -94,13 +95,21 @@ export default function MatchesPage() {
     queryFn: async () => (await api.get<ApiResponse<CancellationPolicy[]>>('/admin/policies')).data.data,
   })
 
+  const { data: referees = [] } = useQuery({
+    queryKey: ['users', { role: 'referee' }],
+    queryFn: async () => {
+      const res = await api.get<ApiResponse<PaginatedResponse<AdminUser>>>('/admin/users?role=referee&limit=100&offset=0')
+      return res.data.data.items
+    },
+  })
+
   // ─── Form ─────────────────────────────────────────────────────────────────────
 
   const form = useForm<MatchFormValues>({
     resolver: zodResolver(matchSchema),
     defaultValues: {
       sport_id: '', pitch_id: '', date: '', time: '', duration: 90,
-      players_format: '', join_price: 0, cancellation_policy_id: '',
+      players_format: '', join_price: 0, cancellation_policy_id: '', referee_id: '',
     },
   })
 
@@ -131,6 +140,7 @@ export default function MatchesPage() {
       players_format: freshMatch.players_format,
       join_price: freshMatch.join_price,
       cancellation_policy_id: freshMatch.cancellation_policy_id ?? '',
+      referee_id: freshMatch.referee_id ?? '',
     })
     if (freshMatch.pitch?.services) {
       setMatchServiceIds(freshMatch.pitch.services.map(s => s.id))
@@ -194,7 +204,7 @@ export default function MatchesPage() {
 
   function openCreate() {
     setEditTarget(null)
-    form.reset({ sport_id: '', pitch_id: '', date: '', time: '', duration: 90, players_format: '', join_price: 0, cancellation_policy_id: '' })
+    form.reset({ sport_id: '', pitch_id: '', date: '', time: '', duration: 90, players_format: '', join_price: 0, cancellation_policy_id: '', referee_id: '' })
     setMatchServiceIds([])
     setSheetOpen(true)
   }
@@ -211,6 +221,7 @@ export default function MatchesPage() {
       players_format: match.players_format,
       join_price: match.join_price,
       cancellation_policy_id: match.cancellation_policy_id ?? '',
+      referee_id: match.referee_id ?? '',
     })
     setSheetOpen(true)
   }
@@ -230,6 +241,7 @@ export default function MatchesPage() {
       cancellation_policy_id: values.cancellation_policy_id,
       status: 'active',
       service_ids: matchServiceIds.length > 0 ? matchServiceIds : undefined,
+      referee_id: values.referee_id || undefined,
     }
     if (editTarget) updateMutation.mutate({ id: editTarget.id, payload })
     else createMutation.mutate(payload)
@@ -278,6 +290,13 @@ export default function MatchesPage() {
       key: 'duration',
       header: 'Duration',
       cell: row => <span className="text-sm text-muted-foreground">{row.duration ? `${row.duration} min` : '—'}</span>,
+    },
+    {
+      key: 'referee',
+      header: 'Referee',
+      cell: row => row.referee
+        ? <span className="text-sm">{row.referee.first_name} {row.referee.last_name}</span>
+        : <span className="text-xs text-muted-foreground">—</span>,
     },
     {
       key: 'price',
@@ -514,6 +533,24 @@ export default function MatchesPage() {
                       {policies.map(p => (
                         <SelectItem key={p.id} value={p.id}>
                           {p.name} ({p.cancel_before_hours}h)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={form.control} name="referee_id" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Assigned Referee (optional)</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="No referee" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="">No referee</SelectItem>
+                      {referees.map(r => (
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.first_name} {r.last_name}
                         </SelectItem>
                       ))}
                     </SelectContent>

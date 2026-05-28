@@ -26,7 +26,7 @@ const createUserSchema = z.object({
   email: z.string().email('Valid email is required'),
   phone: z.string().min(7, 'Valid phone number is required'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  role: z.enum(['player', 'manager', 'admin']),
+  role: z.enum(['player', 'manager', 'admin', 'referee']),
   gender: z.enum(['male', 'female']),
 })
 
@@ -36,6 +36,7 @@ const ROLE_BADGE: Record<string, string> = {
   admin: 'bg-red-100 text-red-700',
   manager: 'bg-blue-100 text-blue-700',
   player: 'bg-slate-100 text-slate-600',
+  referee: 'bg-green-100 text-green-700',
 }
 
 export default function UsersPage() {
@@ -180,6 +181,7 @@ export default function UsersPage() {
               <SelectItem value="player">Player</SelectItem>
               <SelectItem value="manager">Manager</SelectItem>
               <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="referee">Referee</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -238,6 +240,7 @@ export default function UsersPage() {
                         <SelectItem value="manager">Manager</SelectItem>
                         <SelectItem value="admin">Admin</SelectItem>
                         <SelectItem value="player">Player</SelectItem>
+                        <SelectItem value="referee">Referee</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
