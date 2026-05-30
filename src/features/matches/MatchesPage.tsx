@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Plus, Pencil, XCircle, RefreshCw, Eye } from 'lucide-react'
@@ -26,6 +26,7 @@ import {
 } from '@/lib/utils'
 import type { ApiResponse, PaginatedResponse, Match, MatchPayload, Sport, Pitch, CancellationPolicy, AdminUser } from '@/types/api'
 
+const EMPTY_ARRAY: never[] = []
 const FORMATS = ['5v5', '6v6', '7v7', '8v8', '11v11']
 
 const matchSchema = z.object({
@@ -113,9 +114,10 @@ export default function MatchesPage() {
     },
   })
 
-  // Watch sport_id to filter pitches in the form dropdown
-  const selectedSportId = form.watch('sport_id')
-  const watchedPitchId = form.watch('pitch_id')
+  // useWatch is concurrent-mode safe — unlike form.watch() in the render body
+  // which can trigger urgent setState calls that interrupt React 18 navigation transitions.
+  const selectedSportId = useWatch({ control: form.control, name: 'sport_id', defaultValue: '' })
+  const watchedPitchId = useWatch({ control: form.control, name: 'pitch_id', defaultValue: '' })
 
   // Fresh single-match fetch for the edit form — uses the new admin detail endpoint
   const { data: freshMatch } = useQuery({
@@ -148,7 +150,7 @@ export default function MatchesPage() {
   }, [freshMatch])
 
   // Pitches filtered by the selected sport — only fetched when a sport is selected
-  const { data: formPitches = [] } = useQuery({
+  const { data: formPitches = EMPTY_ARRAY } = useQuery({
     queryKey: ['pitches', { sport_id: selectedSportId }],
     queryFn: async () => {
       const res = await api.get<ApiResponse<Pitch[]>>(`/pitches?sport_id=${selectedSportId}`)
@@ -161,9 +163,15 @@ export default function MatchesPage() {
   useEffect(() => {
     if (watchedPitchId) {
       const pitch = formPitches.find(p => p.id === watchedPitchId)
-      setMatchServiceIds(pitch?.services?.map(s => s.id) ?? [])
+      const serviceIds = pitch?.services?.map(s => s.id) ?? EMPTY_ARRAY
+      setMatchServiceIds(prev => {
+        if (prev.length === serviceIds.length && prev.every((id, idx) => id === serviceIds[idx])) {
+          return prev
+        }
+        return serviceIds
+      })
     } else {
-      setMatchServiceIds([])
+      setMatchServiceIds(prev => prev.length === 0 ? prev : EMPTY_ARRAY)
     }
   }, [watchedPitchId, formPitches])
 

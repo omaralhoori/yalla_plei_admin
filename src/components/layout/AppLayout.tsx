@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ReactNode } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import Sidebar, { SidebarNav } from './Sidebar'
 import Header from './Header'
@@ -10,11 +10,15 @@ interface AppLayoutProps {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const mainRef = useRef<HTMLElement>(null)
   const { pathname } = useLocation()
 
   useEffect(() => {
-    mainRef.current?.scrollTo(0, 0)
+    // Remove any body styles Radix UI may have left when a modal/sheet was
+    // open and the user navigated away before closing it.
+    document.body.style.removeProperty('overflow')
+    document.body.removeAttribute('data-scroll-locked')
+    document.body.removeAttribute('data-radix-scroll-area-corner-width')
+    document.body.removeAttribute('data-radix-scroll-area-corner-height')
   }, [pathname])
 
   return (
@@ -31,7 +35,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
       <div className="flex flex-col flex-1 min-w-0">
         <Header onMenuClick={() => setMobileOpen(true)} />
-        <main ref={mainRef} className="flex-1 p-4 md:p-6 overflow-auto">
+        {/* key={pathname} forces a full remount on every navigation, which resets
+            scroll position and prevents DOM/state bleed-through from the previous page. */}
+        <main key={pathname} className="flex-1 p-4 md:p-6 overflow-auto">
           {children}
         </main>
       </div>
