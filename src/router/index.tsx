@@ -1,7 +1,34 @@
 import { lazy, Suspense } from 'react'
-import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom'
+import { createBrowserRouter, Navigate, Outlet, useRouteError, useNavigate } from 'react-router-dom'
 import { isAuthenticated, isAdmin, clearAllTokens } from '@/hooks/useAuth'
 import AppLayout from '@/components/layout/AppLayout'
+
+function PageError() {
+  const error = useRouteError() as { message?: string }
+  const navigate = useNavigate()
+  return (
+    <div className="flex flex-col items-center justify-center h-64 gap-3 text-center px-4">
+      <p className="text-base font-medium text-destructive">Something went wrong on this page.</p>
+      {error?.message && (
+        <p className="text-xs text-muted-foreground font-mono max-w-sm">{error.message}</p>
+      )}
+      <div className="flex gap-3 mt-1">
+        <button
+          className="text-sm text-primary underline"
+          onClick={() => navigate(-1)}
+        >
+          Go back
+        </button>
+        <button
+          className="text-sm text-primary underline"
+          onClick={() => window.location.reload()}
+        >
+          Refresh
+        </button>
+      </div>
+    </div>
+  )
+}
 
 const LoginPage = lazy(() => import('@/features/auth/LoginPage'))
 const DashboardPage = lazy(() => import('@/features/dashboard/DashboardPage'))
@@ -52,20 +79,20 @@ export const router = createBrowserRouter([
   {
     element: <ProtectedRoute />,
     children: [
-      { path: '/dashboard', element: <DashboardPage /> },
-      { path: '/users', element: <UsersPage /> },
-      { path: '/users/:id', element: <UserDetailPage /> },
-      { path: '/sports', element: <SportsPage /> },
-      { path: '/teams', element: <TeamsPage /> },
-      { path: '/pitches', element: <PitchesPage /> },
-      { path: '/services', element: <ServicesPage /> },
-      { path: '/matches', element: <MatchesPage /> },
-      { path: '/matches/:id', element: <MatchDetailPage /> },
-      { path: '/bookings', element: <BookingsPage /> },
-      { path: '/financials', element: <FinancialsPage /> },
-      { path: '/loyalty', element: <LoyaltyPage /> },
-      { path: '/highlights', element: <HighlightsPage /> },
-      { path: '/settings', element: <SettingsPage /> },
+      { path: '/dashboard', element: <DashboardPage />, errorElement: <PageError /> },
+      { path: '/users', element: <UsersPage />, errorElement: <PageError /> },
+      { path: '/users/:id', element: <UserDetailPage />, errorElement: <PageError /> },
+      { path: '/sports', element: <SportsPage />, errorElement: <PageError /> },
+      { path: '/teams', element: <TeamsPage />, errorElement: <PageError /> },
+      { path: '/pitches', element: <PitchesPage />, errorElement: <PageError /> },
+      { path: '/services', element: <ServicesPage />, errorElement: <PageError /> },
+      { path: '/matches', element: <MatchesPage />, errorElement: <PageError /> },
+      { path: '/matches/:id', element: <MatchDetailPage />, errorElement: <PageError /> },
+      { path: '/bookings', element: <BookingsPage />, errorElement: <PageError /> },
+      { path: '/financials', element: <FinancialsPage />, errorElement: <PageError /> },
+      { path: '/loyalty', element: <LoyaltyPage />, errorElement: <PageError /> },
+      { path: '/highlights', element: <HighlightsPage />, errorElement: <PageError /> },
+      { path: '/settings', element: <SettingsPage />, errorElement: <PageError /> },
     ],
   },
   {
