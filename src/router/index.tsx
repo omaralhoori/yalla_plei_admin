@@ -37,6 +37,7 @@ const TeamsPage = lazy(() => import('@/features/sports/TeamsPage'))
 const PitchesPage = lazy(() => import('@/features/pitches/PitchesPage'))
 const ServicesPage = lazy(() => import('@/features/pitches/ServicesPage'))
 const MatchesPage = lazy(() => import('@/features/matches/MatchesPage'))
+const MatchTemplatesPage = lazy(() => import('@/features/matches/MatchTemplatesPage'))
 const MatchDetailPage = lazy(() => import('@/features/matches/MatchDetailPage'))
 const BookingsPage = lazy(() => import('@/features/bookings/BookingsPage'))
 const FinancialsPage = lazy(() => import('@/features/financials/FinancialsPage'))
@@ -87,6 +88,7 @@ export const router = createBrowserRouter([
       { path: '/pitches', element: <PitchesPage />, errorElement: <PageError /> },
       { path: '/services', element: <ServicesPage />, errorElement: <PageError /> },
       { path: '/matches', element: <MatchesPage />, errorElement: <PageError /> },
+      { path: '/match-templates', element: <MatchTemplatesPage />, errorElement: <PageError /> },
       { path: '/matches/:id', element: <MatchDetailPage />, errorElement: <PageError /> },
       { path: '/bookings', element: <BookingsPage />, errorElement: <PageError /> },
       { path: '/financials', element: <FinancialsPage />, errorElement: <PageError /> },

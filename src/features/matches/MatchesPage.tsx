@@ -24,7 +24,7 @@ import {
   matchApiToUtcIso, localToUtcMatchParts,
   utcToLocalDate, utcToLocalTime,
 } from '@/lib/utils'
-import type { ApiResponse, PaginatedResponse, Match, MatchPayload, Sport, Pitch, CancellationPolicy, AdminUser } from '@/types/api'
+import type { ApiResponse, PaginatedResponse, Match, MatchPayload, MatchTemplate, MatchFromTemplatePayload, Sport, Pitch, CancellationPolicy, AdminUser } from '@/types/api'
 
 const EMPTY_ARRAY: never[] = []
 const FORMATS = ['5v5', '6v6', '7v7', '8v8', '11v11']
@@ -57,6 +57,7 @@ export default function MatchesPage() {
   const [editTarget, setEditTarget] = useState<Match | null>(null)
   const [cancelTarget, setCancelTarget] = useState<Match | null>(null)
   const [matchServiceIds, setMatchServiceIds] = useState<string[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
 
   // Filter bar state
   const [sportFilter, setSportFilter] = useState('')
@@ -106,6 +107,11 @@ export default function MatchesPage() {
       const res = await api.get<ApiResponse<PaginatedResponse<AdminUser>>>('/admin/users?role=referee&limit=100&offset=0')
       return res.data.data.items
     },
+  })
+
+  const { data: templates = [] } = useQuery({
+    queryKey: ['match-templates'],
+    queryFn: async () => (await api.get<ApiResponse<MatchTemplate[]>>('/admin/match-templates')).data.data,
   })
 
   // ─── Form ─────────────────────────────────────────────────────────────────────
@@ -165,8 +171,10 @@ export default function MatchesPage() {
     enabled: !!selectedSportId,
   })
 
-  // Auto-populate services checklist from the selected pitch's defaults
+  // Auto-populate services checklist from the selected pitch's defaults.
+  // Skipped while a template is active — template features are handled server-side.
   useEffect(() => {
+    if (selectedTemplateId) return
     if (watchedPitchId) {
       const pitch = formPitches.find(p => p.id === watchedPitchId)
       const serviceIds = pitch?.services?.map(s => s.id) ?? EMPTY_ARRAY
@@ -179,7 +187,7 @@ export default function MatchesPage() {
     } else {
       setMatchServiceIds(prev => prev.length === 0 ? prev : EMPTY_ARRAY)
     }
-  }, [watchedPitchId, formPitches])
+  }, [watchedPitchId, formPitches, selectedTemplateId])
 
   // ─── Mutations ────────────────────────────────────────────────────────────────
 
@@ -188,6 +196,16 @@ export default function MatchesPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['admin-matches'] })
       toast({ title: 'Match scheduled', variant: 'success' as never })
+      setSheetOpen(false)
+    },
+    onError: () => toast({ title: 'Failed to schedule match', variant: 'destructive' }),
+  })
+
+  const createFromTemplateMutation = useMutation({
+    mutationFn: (payload: MatchFromTemplatePayload) => api.post('/admin/matches/from-template', payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-matches'] })
+      toast({ title: 'Match scheduled from template', variant: 'success' as never })
       setSheetOpen(false)
     },
     onError: () => toast({ title: 'Failed to schedule match', variant: 'destructive' }),
@@ -218,13 +236,39 @@ export default function MatchesPage() {
 
   function openCreate() {
     setEditTarget(null)
+    setSelectedTemplateId('')
     form.reset({ sport_id: '', pitch_id: '', date: '', time: '', duration: 90, players_format: '', join_price: 0, cancellation_policy_id: '', referee_id: '', registration_opens_hours_before: 0 })
     setMatchServiceIds([])
     setSheetOpen(true)
   }
 
+  // Pre-fill the form from a saved template. Date/time stay empty for the admin to set.
+  function applyTemplate(templateId: string) {
+    if (!templateId) {
+      setSelectedTemplateId('')
+      return
+    }
+    const tpl = templates.find(t => t.id === templateId)
+    if (!tpl) return
+    setSelectedTemplateId(templateId)
+    setMatchServiceIds([])
+    form.reset({
+      sport_id: tpl.sport_id,
+      pitch_id: tpl.pitch_id,
+      date: '',
+      time: '',
+      duration: tpl.duration ?? 90,
+      players_format: tpl.players_format,
+      join_price: tpl.join_price,
+      cancellation_policy_id: tpl.cancellation_policy_id ?? '',
+      referee_id: tpl.referee_id ?? '',
+      registration_opens_hours_before: tpl.registration_opens_hours_before ?? 0,
+    })
+  }
+
   function openEdit(match: Match) {
     setEditTarget(match)
+    setSelectedTemplateId('')
     const iso = matchApiToUtcIso(match.date ?? '', match.time ?? '')
     form.reset({
       sport_id: match.sport_id,
@@ -245,6 +289,26 @@ export default function MatchesPage() {
     // Convert local date + time inputs to the UTC date (YYYY-MM-DD) and time (HH:MM:SS)
     // parts that the Match API expects — NOT full ISO strings.
     const { date: utcDate, time: utcTime } = localToUtcMatchParts(values.date, values.time)
+
+    // Creating from a template: pitch/sport & feature services come from the template;
+    // every other field is sent as an override.
+    if (!editTarget && selectedTemplateId) {
+      const tplPayload: MatchFromTemplatePayload = {
+        template_id: selectedTemplateId,
+        date: utcDate,
+        time: utcTime,
+        duration: values.duration,
+        players_format: values.players_format,
+        join_price: values.join_price,
+        cancellation_policy_id: values.cancellation_policy_id,
+        referee_id: values.referee_id || undefined,
+        registration_opens_hours_before: values.registration_opens_hours_before,
+        status: 'active',
+      }
+      createFromTemplateMutation.mutate(tplPayload)
+      return
+    }
+
     const payload: MatchPayload = {
       sport_id: values.sport_id,
       pitch_id: values.pitch_id,
@@ -272,7 +336,7 @@ export default function MatchesPage() {
     setMatchServiceIds(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id])
   }
 
-  const isBusy = createMutation.isPending || updateMutation.isPending
+  const isBusy = createMutation.isPending || updateMutation.isPending || createFromTemplateMutation.isPending
   const selectedPitch = formPitches.find(p => p.id === watchedPitchId) ?? null
   const pitchServices = selectedPitch?.services ?? []
 
@@ -431,6 +495,29 @@ export default function MatchesPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 space-y-4">
 
+              {/* Template picker — create mode only. Pre-fills the form from a saved preset. */}
+              {!editTarget && templates.length > 0 && (
+                <div className="space-y-1.5 p-3 border rounded-lg bg-muted/40">
+                  <Label className="text-sm font-medium">Start from a template (optional)</Label>
+                  <Select value={selectedTemplateId || '__none__'} onValueChange={v => applyTemplate(v === '__none__' ? '' : v)}>
+                    <SelectTrigger><SelectValue placeholder="No template" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">No template — start blank</SelectItem>
+                      {templates.map(t => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name} — {t.pitch?.name_en ?? ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedTemplateId && (
+                    <p className="text-xs text-muted-foreground">
+                      Pitch, sport and features are set by the template. Adjust any other field, then set the date & time.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Sport — clearing pitch when sport changes */}
               <FormField control={form.control} name="sport_id" render={({ field }) => (
                 <FormItem>
@@ -442,6 +529,7 @@ export default function MatchesPage() {
                       setMatchServiceIds([])
                     }}
                     value={field.value}
+                    disabled={!!selectedTemplateId}
                   >
                     <FormControl><SelectTrigger><SelectValue placeholder="Select sport" /></SelectTrigger></FormControl>
                     <SelectContent>
@@ -459,7 +547,7 @@ export default function MatchesPage() {
                   <Select
                     onValueChange={field.onChange}
                     value={field.value}
-                    disabled={!selectedSportId}
+                    disabled={!selectedSportId || !!selectedTemplateId}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -477,8 +565,15 @@ export default function MatchesPage() {
                 </FormItem>
               )} />
 
+              {/* Feature note when scheduling from a template */}
+              {selectedTemplateId && (
+                <p className="text-xs text-muted-foreground p-3 border rounded-lg bg-muted/40">
+                  Feature add-ons are inherited from the template. Manage them by editing the template itself.
+                </p>
+              )}
+
               {/* Services checklist — pre-populated from pitch defaults, fully toggleable */}
-              {pitchServices.length > 0 && (
+              {!selectedTemplateId && pitchServices.length > 0 && (
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Services for this match</Label>
                   <p className="text-xs text-muted-foreground -mt-1">

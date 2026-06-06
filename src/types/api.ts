@@ -178,6 +178,51 @@ export interface MatchPayload {
   registration_opens_hours_before?: number
 }
 
+// ─── Match Template ──────────────────────────────────────────────────────────
+
+export interface MatchTemplate {
+  id: string
+  name: string
+  pitch_id: string
+  sport_id: string
+  duration: number
+  players_format: string
+  join_price: number
+  cancellation_policy_id?: string
+  referee_id?: string | null
+  registration_opens_hours_before?: number
+  created_at?: string
+  updated_at?: string
+  pitch?: Pitch
+  sport?: Sport
+  services?: Service[]
+}
+
+export interface MatchTemplatePayload {
+  name: string
+  pitch_id: string
+  sport_id: string
+  duration: number
+  players_format: string
+  join_price: number
+  cancellation_policy_id?: string
+  referee_id?: string
+  registration_opens_hours_before?: number
+}
+
+export interface MatchFromTemplatePayload {
+  template_id: string
+  date: string
+  time: string
+  duration?: number
+  players_format?: string
+  join_price?: number
+  referee_id?: string
+  cancellation_policy_id?: string
+  registration_opens_hours_before?: number
+  status?: MatchStatus
+}
+
 // ─── Financial Transaction ───────────────────────────────────────────────────
 
 export type TransactionStatus = 'pending' | 'completed' | 'failed'
