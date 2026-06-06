@@ -397,6 +397,30 @@ export interface CancelBookingPayload {
   refund: boolean
 }
 
+// ─── Waitlist ─────────────────────────────────────────────────────────────────
+
+export type WaitlistStatus = 'waiting' | 'offered' | 'accepted' | 'expired' | 'cancelled'
+
+export interface WaitlistEntry {
+  id: string
+  match_id: string
+  player_id: string
+  status: WaitlistStatus
+  position: number
+  offered_at?: string | null
+  expires_at?: string | null
+  created_at: string
+  player?: { id: string; first_name: string; last_name: string; avatar_url?: string }
+}
+
+// ─── App Settings ─────────────────────────────────────────────────────────────
+
+export interface AppSetting {
+  key: string
+  value: string
+  updated_at?: string
+}
+
 // ─── Highlight ────────────────────────────────────────────────────────────────
 
 export interface Highlight {

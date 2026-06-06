@@ -3,20 +3,25 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, Construction } from 'lucide-react'
+import { Plus, Pencil, Trash2, Construction, Hourglass } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import PageHeader from '@/components/shared/PageHeader'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { useToast } from '@/hooks/use-toast'
 import { api } from '@/lib/api'
-import type { ApiResponse, CancellationPolicy, PolicyPayload } from '@/types/api'
+import type { ApiResponse, CancellationPolicy, PolicyPayload, AppSetting } from '@/types/api'
+
+const WAITLIST_OFFER_KEY = 'waitlist_offer_duration_minutes'
 
 const policySchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -143,6 +148,90 @@ function PoliciesTab() {
   )
 }
 
+// ─── Waitlist settings ──────────────────────────────────────────────────────
+
+const waitlistSchema = z.object({
+  minutes: z.coerce.number().int('Must be a whole number').positive('Must be greater than 0'),
+})
+type WaitlistFormValues = z.infer<typeof waitlistSchema>
+
+function WaitlistTab() {
+  const qc = useQueryClient()
+  const { toast } = useToast()
+
+  const { data: settings = [], isLoading } = useQuery({
+    queryKey: ['admin-settings'],
+    queryFn: async () => (await api.get<ApiResponse<AppSetting[]>>('/admin/settings')).data.data,
+  })
+
+  const current = settings.find(s => s.key === WAITLIST_OFFER_KEY)
+  const currentMinutes = current ? Number(current.value) : 30
+
+  const form = useForm<WaitlistFormValues>({
+    resolver: zodResolver(waitlistSchema),
+    values: { minutes: currentMinutes },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: (payload: { minutes: number }) =>
+      api.put('/admin/settings/waitlist-offer-duration', payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-settings'] })
+      toast({ title: 'Waitlist offer duration updated', variant: 'success' as never })
+    },
+    onError: () => toast({ title: 'Failed to update setting', variant: 'destructive' }),
+  })
+
+  function onSubmit(v: WaitlistFormValues) {
+    updateMutation.mutate({ minutes: v.minutes })
+  }
+
+  return (
+    <Card className="max-w-xl">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Hourglass className="w-4 h-4" />
+          Waitlist Offer Duration
+        </CardTitle>
+        <CardDescription>
+          When a confirmed seat frees up, it's offered to the next waitlisted player. This is how long
+          they have to book before the offer passes to the next person in the queue.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Skeleton className="h-10 w-full max-w-xs" />
+        ) : (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField control={form.control} name="minutes" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Offer window (minutes)</FormLabel>
+                  <FormControl>
+                    <div className="flex items-center gap-3">
+                      <Input type="number" min="1" step="1" className="max-w-[140px]" {...field} />
+                      <span className="text-sm text-muted-foreground">minutes</span>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <div className="flex items-center gap-3">
+                <Button type="submit" disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? 'Saving…' : 'Save'}
+                </Button>
+                <Label className="text-xs text-muted-foreground font-normal">
+                  Current: {currentMinutes} minute{currentMinutes !== 1 ? 's' : ''}
+                </Label>
+              </div>
+            </form>
+          </Form>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 function ComingSoonTab({ label }: { label: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground gap-3">
@@ -160,10 +249,12 @@ export default function SettingsPage() {
       <Tabs defaultValue="policies">
         <TabsList className="mb-4">
           <TabsTrigger value="policies">Cancellation Policies</TabsTrigger>
+          <TabsTrigger value="waitlist">Waitlist</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="app">App Config</TabsTrigger>
         </TabsList>
         <TabsContent value="policies"><PoliciesTab /></TabsContent>
+        <TabsContent value="waitlist"><WaitlistTab /></TabsContent>
         <TabsContent value="notifications"><ComingSoonTab label="Notification" /></TabsContent>
         <TabsContent value="app"><ComingSoonTab label="App" /></TabsContent>
       </Tabs>

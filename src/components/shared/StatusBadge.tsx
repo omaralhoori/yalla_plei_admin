@@ -9,6 +9,10 @@ const statusConfig = {
   confirmed: { label: 'Confirmed', variant: 'success' as const },
   pending_payment: { label: 'Pending Payment', variant: 'warning' as const },
   waitlist: { label: 'Waitlist', variant: 'secondary' as const },
+  waiting: { label: 'Waiting', variant: 'secondary' as const },
+  offered: { label: 'Offered', variant: 'warning' as const },
+  accepted: { label: 'Accepted', variant: 'success' as const },
+  expired: { label: 'Expired', variant: 'destructive' as const },
   true: { label: 'Yes', variant: 'success' as const },
   false: { label: 'No', variant: 'secondary' as const },
 } as const

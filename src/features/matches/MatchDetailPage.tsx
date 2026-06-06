@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
   ArrowLeft, Calendar, MapPin, Users, DollarSign,
-  Clock, ShieldCheck, BarChart3, Film,
+  Clock, ShieldCheck, BarChart3, Film, Hourglass,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -22,7 +22,7 @@ import ImageUpload from '@/components/shared/ImageUpload'
 import { useToast } from '@/hooks/use-toast'
 import { api } from '@/lib/api'
 import { formatCurrency, formatDateTime, formatDate, matchApiToUtcIso, formatMatchEndTime } from '@/lib/utils'
-import type { ApiResponse, PaginatedResponse, Match, AdminBooking, HighlightPayload, Sport } from '@/types/api'
+import type { ApiResponse, PaginatedResponse, Match, AdminBooking, HighlightPayload, Sport, WaitlistEntry } from '@/types/api'
 
 // ─── Highlight form schema (match_id injected at submit time, not in form) ────
 
@@ -100,6 +100,17 @@ export default function MatchDetailPage() {
         `/admin/bookings?match_id=${id}&limit=100&offset=0`
       )
       return res.data.data.items ?? []
+    },
+    enabled: !!id,
+  })
+
+  // ─── Waitlist for this match ──────────────────────────────────────────────────
+
+  const { data: waitlist = [], isLoading: waitlistLoading } = useQuery({
+    queryKey: ['match-waitlist', id],
+    queryFn: async () => {
+      const res = await api.get<ApiResponse<WaitlistEntry[]>>(`/admin/matches/${id}/waitlist`)
+      return res.data.data ?? []
     },
     enabled: !!id,
   })
@@ -202,6 +213,42 @@ export default function MatchDetailPage() {
     },
   ]
 
+  // ─── Waitlist columns ─────────────────────────────────────────────────────────
+
+  const waitlistColumns: Column<WaitlistEntry>[] = [
+    {
+      key: 'position',
+      header: '#',
+      cell: row => <span className="font-semibold text-sm">{row.position}</span>,
+    },
+    {
+      key: 'player',
+      header: 'Player',
+      cell: row => (
+        <div className="font-medium text-sm">
+          {row.player ? `${row.player.first_name} ${row.player.last_name}` : 'Unknown'}
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      cell: row => <StatusBadge status={row.status} />,
+    },
+    {
+      key: 'joined_at',
+      header: 'Joined Queue',
+      cell: row => <span className="text-sm text-muted-foreground">{formatDateTime(row.created_at)}</span>,
+    },
+    {
+      key: 'deadline',
+      header: 'Offer Deadline',
+      cell: row => row.status === 'offered' && row.expires_at
+        ? <span className="text-sm font-medium text-amber-600">{formatDateTime(row.expires_at)}</span>
+        : <span className="text-xs text-muted-foreground">—</span>,
+    },
+  ]
+
   return (
     <div className="space-y-6">
 
@@ -269,6 +316,31 @@ export default function MatchDetailPage() {
             data={bookings}
             isLoading={bookingsLoading}
             emptyMessage="No players have booked this match yet."
+          />
+        </CardContent>
+      </Card>
+
+      {/* Waitlist */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Hourglass className="w-4 h-4" />
+            Waitlist
+          </CardTitle>
+          <CardDescription>
+            {waitlistLoading
+              ? 'Loading…'
+              : waitlist.length === 0
+                ? 'No players are waiting for a seat.'
+                : `${waitlist.length} player${waitlist.length !== 1 ? 's' : ''} in queue — a freed seat is offered to position 1 first.`}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <DataTable
+            columns={waitlistColumns}
+            data={waitlist}
+            isLoading={waitlistLoading}
+            emptyMessage="No one is on the waitlist for this match."
           />
         </CardContent>
       </Card>
