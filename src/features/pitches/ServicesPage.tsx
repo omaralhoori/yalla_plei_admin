@@ -61,6 +61,7 @@ const serviceSchema = z.object({
   name_en: z.string().min(1, 'English name is required'),
   name_ar: z.string().min(1, 'Arabic name is required'),
   icon_code: z.string().min(1, 'Icon is required'),
+  type: z.enum(['facility', 'feature'], { required_error: 'Type is required' }),
 })
 
 type ServiceFormValues = z.infer<typeof serviceSchema>
@@ -84,7 +85,7 @@ export default function ServicesPage() {
 
   const form = useForm<ServiceFormValues>({
     resolver: zodResolver(serviceSchema),
-    defaultValues: { name_en: '', name_ar: '', icon_code: '' },
+    defaultValues: { name_en: '', name_ar: '', icon_code: '', type: 'facility' },
   })
 
   const createMutation = useMutation({
@@ -120,13 +121,13 @@ export default function ServicesPage() {
 
   function openCreate() {
     setEditTarget(null)
-    form.reset({ name_en: '', name_ar: '', icon_code: '' })
+    form.reset({ name_en: '', name_ar: '', icon_code: '', type: 'facility' })
     setSheetOpen(true)
   }
 
   function openEdit(s: Service) {
     setEditTarget(s)
-    form.reset({ name_en: s.name_en, name_ar: s.name_ar, icon_code: s.icon_code })
+    form.reset({ name_en: s.name_en, name_ar: s.name_ar, icon_code: s.icon_code, type: s.type ?? 'facility' })
     setSheetOpen(true)
   }
 
@@ -152,6 +153,19 @@ export default function ServicesPage() {
     },
     { key: 'name_en', header: 'Name (EN)', cell: row => <span className="font-medium">{row.name_en}</span> },
     { key: 'name_ar', header: 'Name (AR)', cell: row => <span dir="rtl">{row.name_ar}</span> },
+    {
+      key: 'type',
+      header: 'Type',
+      cell: row => (
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+          row.type === 'feature'
+            ? 'bg-violet-100 text-violet-700'
+            : 'bg-sky-100 text-sky-700'
+        }`}>
+          {row.type === 'feature' ? 'Feature' : 'Facility'}
+        </span>
+      ),
+    },
     {
       key: 'icon_code',
       header: 'Icon Code',
@@ -237,6 +251,28 @@ export default function ServicesPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* ── Type: facility (pitch amenity) vs feature (match add-on) ── */}
+              <FormField control={form.control} name="type" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Type</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="facility">Facility (pitch amenity)</SelectItem>
+                      <SelectItem value="feature">Feature (match add-on)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Facilities are permanent pitch amenities (parking, changing rooms). Features are per-match add-ons (extra ball, video).
+                  </p>
                   <FormMessage />
                 </FormItem>
               )} />

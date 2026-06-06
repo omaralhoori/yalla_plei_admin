@@ -39,6 +39,10 @@ const matchSchema = z.object({
   join_price: z.coerce.number().positive('Price must be greater than 0'),
   cancellation_policy_id: z.string().min(1, 'Policy is required'),
   referee_id: z.string().optional(),
+  registration_opens_hours_before: z.coerce
+    .number()
+    .int('Must be a whole number')
+    .min(0, 'Cannot be negative'),
 })
 
 type MatchFormValues = z.infer<typeof matchSchema>
@@ -111,6 +115,7 @@ export default function MatchesPage() {
     defaultValues: {
       sport_id: '', pitch_id: '', date: '', time: '', duration: 90,
       players_format: '', join_price: 0, cancellation_policy_id: '', referee_id: '',
+      registration_opens_hours_before: 0,
     },
   })
 
@@ -143,6 +148,7 @@ export default function MatchesPage() {
       join_price: freshMatch.join_price,
       cancellation_policy_id: freshMatch.cancellation_policy_id ?? '',
       referee_id: freshMatch.referee_id ?? '',
+      registration_opens_hours_before: freshMatch.registration_opens_hours_before ?? 0,
     })
     if (freshMatch.pitch?.services) {
       setMatchServiceIds(freshMatch.pitch.services.map(s => s.id))
@@ -212,7 +218,7 @@ export default function MatchesPage() {
 
   function openCreate() {
     setEditTarget(null)
-    form.reset({ sport_id: '', pitch_id: '', date: '', time: '', duration: 90, players_format: '', join_price: 0, cancellation_policy_id: '', referee_id: '' })
+    form.reset({ sport_id: '', pitch_id: '', date: '', time: '', duration: 90, players_format: '', join_price: 0, cancellation_policy_id: '', referee_id: '', registration_opens_hours_before: 0 })
     setMatchServiceIds([])
     setSheetOpen(true)
   }
@@ -230,6 +236,7 @@ export default function MatchesPage() {
       join_price: match.join_price,
       cancellation_policy_id: match.cancellation_policy_id ?? '',
       referee_id: match.referee_id ?? '',
+      registration_opens_hours_before: match.registration_opens_hours_before ?? 0,
     })
     setSheetOpen(true)
   }
@@ -250,6 +257,7 @@ export default function MatchesPage() {
       status: 'active',
       service_ids: matchServiceIds.length > 0 ? matchServiceIds : undefined,
       referee_id: values.referee_id || undefined,
+      registration_opens_hours_before: values.registration_opens_hours_before,
     }
     if (editTarget) updateMutation.mutate({ id: editTarget.id, payload })
     else createMutation.mutate(payload)
@@ -298,6 +306,17 @@ export default function MatchesPage() {
       key: 'duration',
       header: 'Duration',
       cell: row => <span className="text-sm text-muted-foreground">{row.duration ? `${row.duration} min` : '—'}</span>,
+    },
+    {
+      key: 'registration',
+      header: 'Registration Opens',
+      cell: row => (
+        <span className="text-sm text-muted-foreground">
+          {row.registration_opens_hours_before
+            ? `${row.registration_opens_hours_before}h before`
+            : 'Always open'}
+        </span>
+      ),
     },
     {
       key: 'referee',
@@ -507,6 +526,19 @@ export default function MatchesPage() {
                   <FormControl>
                     <Input type="number" min="1" step="1" placeholder="90" {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={form.control} name="registration_opens_hours_before" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Registration Opens (hours before match)</FormLabel>
+                  <FormControl>
+                    <Input type="number" min="0" step="1" placeholder="0" {...field} />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    How many hours before kickoff player registration opens. Set to 0 to keep it always open.
+                  </p>
                   <FormMessage />
                 </FormItem>
               )} />

@@ -69,10 +69,11 @@ export default function PitchesPage() {
     },
   })
 
+  // Only facility-type services apply as pitch amenities (features are match add-ons)
   const { data: services = [] } = useQuery({
-    queryKey: ['services'],
+    queryKey: ['services', { type: 'facility' }],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<Service[]>>('/admin/services')
+      const res = await api.get<ApiResponse<Service[]>>('/admin/services?type=facility')
       return res.data.data
     },
   })
@@ -277,7 +278,7 @@ export default function PitchesPage() {
 
               {services.length > 0 && (
                 <div className="space-y-2">
-                  <Label>Services</Label>
+                  <Label>Facilities</Label>
                   <div className="grid grid-cols-2 gap-2 p-3 border rounded-lg">
                     {services.map(svc => (
                       <div key={svc.id} className="flex items-center gap-2">

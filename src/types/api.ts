@@ -78,17 +78,21 @@ export interface TeamPayload {
 
 // ─── Service ─────────────────────────────────────────────────────────────────
 
+export type ServiceType = 'facility' | 'feature'
+
 export interface Service {
   id: string
   name_ar: string
   name_en: string
   icon_code: string
+  type: ServiceType
 }
 
 export interface ServicePayload {
   name_ar: string
   name_en: string
   icon_code: string
+  type: ServiceType
 }
 
 // ─── Pitch ───────────────────────────────────────────────────────────────────
@@ -150,6 +154,7 @@ export interface Match {
   players_format: string
   join_price: number
   status?: MatchStatus
+  registration_opens_hours_before?: number
   cancellation_policy_id?: string
   cancellation_policy?: CancellationPolicy
   sport?: Sport
@@ -170,6 +175,7 @@ export interface MatchPayload {
   status?: MatchStatus
   service_ids?: string[]
   referee_id?: string
+  registration_opens_hours_before?: number
 }
 
 // ─── Financial Transaction ───────────────────────────────────────────────────
