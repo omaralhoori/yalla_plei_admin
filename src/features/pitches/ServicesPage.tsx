@@ -8,6 +8,7 @@ import {
   Car, Droplets, Wifi, Utensils, CircleDot,
   Shirt, Store, HeartPulse, Users, Coffee,
   Dumbbell, ShieldCheck, Wind, Zap, Droplet, Medal,
+  BriefcaseMedical, Hand, Refrigerator, Gift, Flag, Video, Trees,
   type LucideIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -49,6 +50,14 @@ const MATERIAL_ICONS: IconEntry[] = [
   { code: 'power',             label: 'Power Outlets',    Icon: Zap         },
   { code: 'water',             label: 'Water',            Icon: Droplet     },
   { code: 'sports',            label: 'Sports',           Icon: Medal       },
+  { code: 'dry_cleaning',      label: 'Clean Vests',      Icon: Shirt           },
+  { code: 'health_and_safety', label: 'First Aid Kit',    Icon: BriefcaseMedical },
+  { code: 'sports_handball',   label: 'GK Gloves',        Icon: Hand            },
+  { code: 'kitchen',           label: 'Icebox with Water', Icon: Refrigerator   },
+  { code: 'redeem',            label: 'Rewards',          Icon: Gift            },
+  { code: 'sports_score',      label: 'Referee',          Icon: Flag            },
+  { code: 'videocam',          label: 'Highlight Video',  Icon: Video           },
+  { code: 'park',              label: 'Outdoor',          Icon: Trees           },
 ]
 
 function iconEntry(code: string): IconEntry | undefined {

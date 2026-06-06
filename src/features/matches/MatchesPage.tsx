@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useForm, useWatch } from 'react-hook-form'
@@ -340,6 +340,17 @@ export default function MatchesPage() {
   const selectedPitch = formPitches.find(p => p.id === watchedPitchId) ?? null
   const pitchServices = selectedPitch?.services ?? []
 
+  // When a template is applied, its pitch's sport-filtered list may not have loaded yet.
+  // Surface the template's pitch as an option immediately so the Select can render the value.
+  const activeTemplate = !editTarget ? templates.find(t => t.id === selectedTemplateId) : undefined
+  const pitchOptions = useMemo<Pitch[]>(() => {
+    const tplPitch = activeTemplate?.pitch
+    if (tplPitch && !formPitches.some(p => p.id === tplPitch.id)) {
+      return [tplPitch, ...formPitches]
+    }
+    return formPitches
+  }, [formPitches, activeTemplate])
+
   // ─── Table columns ────────────────────────────────────────────────────────────
 
   const columns: Column<Match>[] = [
@@ -555,9 +566,9 @@ export default function MatchesPage() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {formPitches.length === 0
+                      {pitchOptions.length === 0
                         ? <SelectItem value="_none" disabled>No pitches for this sport</SelectItem>
-                        : formPitches.map(p => <SelectItem key={p.id} value={p.id}>{p.name_en}</SelectItem>)
+                        : pitchOptions.map(p => <SelectItem key={p.id} value={p.id}>{p.name_en}</SelectItem>)
                       }
                     </SelectContent>
                   </Select>
