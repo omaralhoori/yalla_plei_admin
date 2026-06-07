@@ -3,9 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, Construction, Hourglass } from 'lucide-react'
+import { Plus, Pencil, Trash2, Construction, Hourglass, Landmark } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet'
@@ -22,6 +23,7 @@ import { api } from '@/lib/api'
 import type { ApiResponse, CancellationPolicy, PolicyPayload, AppSetting } from '@/types/api'
 
 const WAITLIST_OFFER_KEY = 'waitlist_offer_duration_minutes'
+const DEPOSIT_INSTRUCTIONS_KEY = 'deposit_instructions'
 
 const policySchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -232,6 +234,86 @@ function WaitlistTab() {
   )
 }
 
+// ─── Deposit instructions settings ──────────────────────────────────────────
+
+const depositSchema = z.object({
+  instructions: z.string(),
+})
+type DepositFormValues = z.infer<typeof depositSchema>
+
+function DepositInstructionsTab() {
+  const qc = useQueryClient()
+  const { toast } = useToast()
+
+  const { data: settings = [], isLoading } = useQuery({
+    queryKey: ['admin-settings'],
+    queryFn: async () => (await api.get<ApiResponse<AppSetting[]>>('/admin/settings')).data.data,
+  })
+
+  const current = settings.find(s => s.key === DEPOSIT_INSTRUCTIONS_KEY)
+  const currentValue = current?.value ?? ''
+
+  const form = useForm<DepositFormValues>({
+    resolver: zodResolver(depositSchema),
+    values: { instructions: currentValue },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: (payload: { instructions: string }) =>
+      api.put('/admin/settings/deposit-instructions', payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-settings'] })
+      toast({ title: 'Deposit instructions updated', variant: 'success' as never })
+    },
+    onError: () => toast({ title: 'Failed to update instructions', variant: 'destructive' }),
+  })
+
+  function onSubmit(v: DepositFormValues) {
+    updateMutation.mutate({ instructions: v.instructions })
+  }
+
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Landmark className="w-4 h-4" />
+          Deposit Instructions
+        </CardTitle>
+        <CardDescription>
+          Shown to players before they upload a wallet top-up receipt — typically your company's bank
+          account details. Leave empty to clear it.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Skeleton className="h-28 w-full" />
+        ) : (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField control={form.control} name="instructions" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Message to players</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      rows={5}
+                      placeholder="e.g. Transfer the amount to Yalla Plei Co. — Bank ABC, IBAN JO00 0000 0000, then upload your receipt."
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <Button type="submit" disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? 'Saving…' : 'Save'}
+              </Button>
+            </form>
+          </Form>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 function ComingSoonTab({ label }: { label: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground gap-3">
@@ -250,11 +332,13 @@ export default function SettingsPage() {
         <TabsList className="mb-4">
           <TabsTrigger value="policies">Cancellation Policies</TabsTrigger>
           <TabsTrigger value="waitlist">Waitlist</TabsTrigger>
+          <TabsTrigger value="deposit">Deposit Instructions</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="app">App Config</TabsTrigger>
         </TabsList>
         <TabsContent value="policies"><PoliciesTab /></TabsContent>
         <TabsContent value="waitlist"><WaitlistTab /></TabsContent>
+        <TabsContent value="deposit"><DepositInstructionsTab /></TabsContent>
         <TabsContent value="notifications"><ComingSoonTab label="Notification" /></TabsContent>
         <TabsContent value="app"><ComingSoonTab label="App" /></TabsContent>
       </Tabs>

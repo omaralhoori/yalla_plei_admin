@@ -421,6 +421,34 @@ export interface AppSetting {
   updated_at?: string
 }
 
+// ─── Payment Receipts ─────────────────────────────────────────────────────────
+
+export type ReceiptStatus = 'pending' | 'approved' | 'rejected'
+
+export interface PaymentReceipt {
+  id: string
+  user_id: string
+  amount: number
+  image_url: string
+  note?: string
+  status: ReceiptStatus
+  approved_amount?: number | null
+  admin_note?: string
+  reviewed_by?: string | null
+  reviewed_at?: string | null
+  created_at: string
+  user?: { id: string; first_name: string; last_name: string; avatar_url?: string; email?: string }
+}
+
+export interface ApproveReceiptPayload {
+  amount?: number
+  note?: string
+}
+
+export interface RejectReceiptPayload {
+  note?: string
+}
+
 // ─── Highlight ────────────────────────────────────────────────────────────────
 
 export interface Highlight {

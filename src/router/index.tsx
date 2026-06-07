@@ -41,6 +41,7 @@ const MatchTemplatesPage = lazy(() => import('@/features/matches/MatchTemplatesP
 const MatchDetailPage = lazy(() => import('@/features/matches/MatchDetailPage'))
 const BookingsPage = lazy(() => import('@/features/bookings/BookingsPage'))
 const FinancialsPage = lazy(() => import('@/features/financials/FinancialsPage'))
+const ReceiptsPage = lazy(() => import('@/features/receipts/ReceiptsPage'))
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'))
 const UsersPage = lazy(() => import('@/features/users/UsersPage'))
 const UserDetailPage = lazy(() => import('@/features/users/UserDetailPage'))
@@ -92,6 +93,7 @@ export const router = createBrowserRouter([
       { path: '/matches/:id', element: <MatchDetailPage />, errorElement: <PageError /> },
       { path: '/bookings', element: <BookingsPage />, errorElement: <PageError /> },
       { path: '/financials', element: <FinancialsPage />, errorElement: <PageError /> },
+      { path: '/receipts', element: <ReceiptsPage />, errorElement: <PageError /> },
       { path: '/loyalty', element: <LoyaltyPage />, errorElement: <PageError /> },
       { path: '/highlights', element: <HighlightsPage />, errorElement: <PageError /> },
       { path: '/settings', element: <SettingsPage />, errorElement: <PageError /> },
