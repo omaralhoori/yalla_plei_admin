@@ -24,7 +24,7 @@ import {
   matchApiToUtcIso, localToUtcMatchParts,
   utcToLocalDate, utcToLocalTime,
 } from '@/lib/utils'
-import type { ApiResponse, PaginatedResponse, Match, MatchPayload, MatchTemplate, MatchFromTemplatePayload, Sport, Pitch, CancellationPolicy, AdminUser } from '@/types/api'
+import type { ApiResponse, PaginatedResponse, Match, MatchPayload, MatchTemplate, MatchFromTemplatePayload, Sport, Pitch, CancellationPolicy, AdminUser, Service } from '@/types/api'
 
 const EMPTY_ARRAY: never[] = []
 const FORMATS = ['5v5', '6v6', '7v7', '8v8', '11v11']
@@ -160,6 +160,12 @@ export default function MatchesPage() {
       setMatchServiceIds(freshMatch.pitch.services.map(s => s.id))
     }
   }, [freshMatch])
+
+  // All services (both facility and feature types) — selectable per match
+  const { data: allServices = EMPTY_ARRAY } = useQuery<Service[]>({
+    queryKey: ['services'],
+    queryFn: async () => (await api.get<ApiResponse<Service[]>>('/admin/services')).data.data,
+  })
 
   // Pitches filtered by the selected sport — only fetched when a sport is selected
   const { data: formPitches = EMPTY_ARRAY } = useQuery({
@@ -337,8 +343,6 @@ export default function MatchesPage() {
   }
 
   const isBusy = createMutation.isPending || updateMutation.isPending || createFromTemplateMutation.isPending
-  const selectedPitch = formPitches.find(p => p.id === watchedPitchId) ?? null
-  const pitchServices = selectedPitch?.services ?? []
 
   // When a template is applied, its pitch's sport-filtered list may not have loaded yet.
   // Surface the template's pitch as an option immediately so the Select can render the value.
@@ -583,15 +587,15 @@ export default function MatchesPage() {
                 </p>
               )}
 
-              {/* Services checklist — pre-populated from pitch defaults, fully toggleable */}
-              {!selectedTemplateId && pitchServices.length > 0 && (
+              {/* Services checklist — all services, pre-populated from pitch defaults, fully toggleable */}
+              {!selectedTemplateId && allServices.length > 0 && (
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Services for this match</Label>
                   <p className="text-xs text-muted-foreground -mt-1">
                     Pre-filled from pitch defaults. Toggle to override per-match.
                   </p>
                   <div className="grid grid-cols-2 gap-2 p-3 border rounded-lg bg-muted/50">
-                    {pitchServices.map(svc => (
+                    {allServices.map(svc => (
                       <div key={svc.id} className="flex items-center gap-2">
                         <Checkbox
                           id={`msvc-${svc.id}`}

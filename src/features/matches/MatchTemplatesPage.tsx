@@ -73,10 +73,10 @@ export default function MatchTemplatesPage() {
     },
   })
 
-  // Only feature-type services can be added to a match (and therefore a template)
+  // Show all services (both facility and feature types) as selectable add-ons
   const { data: features = [] } = useQuery({
-    queryKey: ['services', { type: 'feature' }],
-    queryFn: async () => (await api.get<ApiResponse<Service[]>>('/admin/services?type=feature')).data.data,
+    queryKey: ['services'],
+    queryFn: async () => (await api.get<ApiResponse<Service[]>>('/admin/services')).data.data,
   })
 
   // ─── Form ─────────────────────────────────────────────────────────────────────

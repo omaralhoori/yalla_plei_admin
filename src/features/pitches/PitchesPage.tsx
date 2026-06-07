@@ -69,11 +69,11 @@ export default function PitchesPage() {
     },
   })
 
-  // Only facility-type services apply as pitch amenities (features are match add-ons)
+  // Show all services (both facility and feature types) as selectable amenities
   const { data: services = [] } = useQuery({
-    queryKey: ['services', { type: 'facility' }],
+    queryKey: ['services'],
     queryFn: async () => {
-      const res = await api.get<ApiResponse<Service[]>>('/admin/services?type=facility')
+      const res = await api.get<ApiResponse<Service[]>>('/admin/services')
       return res.data.data
     },
   })
