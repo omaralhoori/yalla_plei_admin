@@ -449,6 +449,38 @@ export interface RejectReceiptPayload {
   note?: string
 }
 
+// ─── Country & City ───────────────────────────────────────────────────────────
+
+export interface Country {
+  id: string
+  name_ar: string
+  name_en: string
+  code?: string
+  is_enabled: boolean
+}
+
+export interface CountryPayload {
+  name_ar: string
+  name_en: string
+  code?: string
+  is_enabled?: boolean
+}
+
+export interface City {
+  id: string
+  country_id: string
+  name_ar: string
+  name_en: string
+  is_enabled: boolean
+}
+
+export interface CityPayload {
+  country_id: string
+  name_ar: string
+  name_en: string
+  is_enabled?: boolean
+}
+
 // ─── Highlight ────────────────────────────────────────────────────────────────
 
 export interface Highlight {
