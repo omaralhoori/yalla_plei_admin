@@ -346,14 +346,17 @@ export default function MatchesPage() {
 
   // When a template is applied, its pitch's sport-filtered list may not have loaded yet.
   // Surface the template's pitch as an option immediately so the Select can render the value.
+  // Falls back to allPitches (eagerly loaded for the filter bar) if the nested pitch is absent.
   const activeTemplate = !editTarget ? templates.find(t => t.id === selectedTemplateId) : undefined
   const pitchOptions = useMemo<Pitch[]>(() => {
+    const tplPitchId = activeTemplate?.pitch_id
     const tplPitch = activeTemplate?.pitch
+      ?? (tplPitchId ? allPitches.find(p => p.id === tplPitchId) : undefined)
     if (tplPitch && !formPitches.some(p => p.id === tplPitch.id)) {
       return [tplPitch, ...formPitches]
     }
     return formPitches
-  }, [formPitches, activeTemplate])
+  }, [formPitches, activeTemplate, allPitches])
 
   // ─── Table columns ────────────────────────────────────────────────────────────
 
