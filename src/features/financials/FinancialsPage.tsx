@@ -20,7 +20,7 @@ import { useToast } from '@/hooks/use-toast'
 import { usePagination } from '@/hooks/usePagination'
 import { api } from '@/lib/api'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
-import type { ApiResponse, FinancialTransaction, ManualRefundPayload } from '@/types/api'
+import type { ApiResponse, PaginatedResponse, FinancialTransaction, ManualRefundPayload } from '@/types/api'
 
 const refundSchema = z.object({
   user_id: z.string().min(1, 'User ID is required'),
@@ -32,7 +32,7 @@ type RefundFormValues = z.infer<typeof refundSchema>
 
 export default function FinancialsPage() {
   const { toast } = useToast()
-  const { offset, limit, reset } = usePagination(20)
+  const { offset, limit, goToNextPage, goToPrevPage, reset } = usePagination(20)
   const [searchParams, setSearchParams] = useSearchParams()
 
   const initialUserId = searchParams.get('user_id') ?? ''
@@ -63,7 +63,7 @@ export default function FinancialsPage() {
       if (appliedFilters.user_id) params.set('user_id', appliedFilters.user_id)
       if (appliedFilters.from) params.set('from', appliedFilters.from)
       if (appliedFilters.to) params.set('to', appliedFilters.to)
-      const res = await api.get<ApiResponse<FinancialTransaction[]>>(`/admin/transactions?${params}`)
+      const res = await api.get<ApiResponse<PaginatedResponse<FinancialTransaction>>>(`/admin/transactions?${params}`)
       return res.data.data
     },
   })
@@ -109,7 +109,7 @@ export default function FinancialsPage() {
     setSearchParams(searchParams, { replace: true })
   }
 
-  const transactions = Array.isArray(data) ? data : []
+  const transactions = data?.items ?? []
 
   const columns: Column<FinancialTransaction>[] = [
     {
@@ -227,7 +227,12 @@ export default function FinancialsPage() {
         columns={columns}
         data={transactions}
         isLoading={isLoading}
-        pagination={undefined}
+        pagination={data ? {
+          total: data.meta.total_count,
+          limit,
+          offset,
+          onChange: o => o > offset ? goToNextPage() : goToPrevPage(),
+        } : undefined}
         emptyMessage="No transactions found for the selected filters."
         csvFilename="transactions"
       />
