@@ -3,10 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, AlertCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, AlertCircle, TrendingUp, TrendingDown } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import DataTable, { type Column } from '@/components/shared/DataTable'
@@ -15,7 +16,7 @@ import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import ImageUpload from '@/components/shared/ImageUpload'
 import { useToast } from '@/hooks/use-toast'
 import { api } from '@/lib/api'
-import type { ApiResponse, Level, LevelPayload, Reward, RewardPayload } from '@/types/api'
+import type { ApiResponse, Level, LevelPayload, PointRule, PointRulePayload, Reward, RewardPayload } from '@/types/api'
 
 // ─── Levels Tab ───────────────────────────────────────────────────────────────
 
@@ -393,6 +394,196 @@ function RewardsTab() {
   )
 }
 
+// ─── Point Rules Tab ──────────────────────────────────────────────────────────
+
+const pointRuleSchema = z.object({
+  name_en: z.string().min(1, 'English name is required'),
+  name_ar: z.string().min(1, 'Arabic name is required'),
+  points: z.coerce.number().int().refine(v => v !== 0, { message: 'Points cannot be zero' }),
+  is_enabled: z.boolean(),
+})
+
+type PointRuleFormValues = z.infer<typeof pointRuleSchema>
+
+function PointRulesTab() {
+  const qc = useQueryClient()
+  const { toast } = useToast()
+  const [editTarget, setEditTarget] = useState<PointRule | null>(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
+
+  const { data: rules = [], isLoading } = useQuery({
+    queryKey: ['point-rules'],
+    queryFn: async () => (await api.get<ApiResponse<PointRule[]>>('/admin/point-rules')).data.data,
+  })
+
+  const form = useForm<PointRuleFormValues>({
+    resolver: zodResolver(pointRuleSchema),
+    defaultValues: { name_en: '', name_ar: '', points: 0, is_enabled: true },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ key, payload }: { key: string; payload: PointRulePayload }) =>
+      api.put(`/admin/point-rules/${key}`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['point-rules'] })
+      toast({ title: 'Rule updated', variant: 'success' as never })
+      setSheetOpen(false)
+    },
+    onError: (err: unknown) => {
+      const axiosErr = err as { response?: { data?: { error?: string } } }
+      const msg = axiosErr?.response?.data?.error ?? 'Failed to update rule'
+      toast({ title: msg, variant: 'destructive' })
+    },
+  })
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ key, is_enabled }: { key: string; is_enabled: boolean }) =>
+      api.put(`/admin/point-rules/${key}`, { is_enabled }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['point-rules'] })
+      toast({ title: 'Rule updated', variant: 'success' as never })
+    },
+    onError: () => toast({ title: 'Failed to update rule', variant: 'destructive' }),
+  })
+
+  function openEdit(rule: PointRule) {
+    setEditTarget(rule)
+    form.reset({
+      name_en: rule.name_en,
+      name_ar: rule.name_ar,
+      points: rule.points,
+      is_enabled: rule.is_enabled,
+    })
+    setSheetOpen(true)
+  }
+
+  function onSubmit(values: PointRuleFormValues) {
+    if (!editTarget) return
+    updateMutation.mutate({ key: editTarget.key, payload: values })
+  }
+
+  const columns: Column<PointRule>[] = [
+    {
+      key: 'name_en',
+      header: 'Rule',
+      cell: row => (
+        <div>
+          <div className="font-medium">{row.name_en}</div>
+          <div className="text-xs text-muted-foreground" dir="rtl">{row.name_ar}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'key',
+      header: 'Key',
+      cell: row => (
+        <code className="text-xs bg-muted px-2 py-0.5 rounded">{row.key}</code>
+      ),
+    },
+    {
+      key: 'points',
+      header: 'Points',
+      cell: row => {
+        const isPositive = row.points > 0
+        return (
+          <div className={`inline-flex items-center gap-1 font-semibold text-sm ${isPositive ? 'text-green-600' : 'text-red-500'}`}>
+            {isPositive
+              ? <TrendingUp className="w-3.5 h-3.5" />
+              : <TrendingDown className="w-3.5 h-3.5" />}
+            {isPositive ? `+${row.points}` : row.points}
+          </div>
+        )
+      },
+    },
+    {
+      key: 'is_enabled',
+      header: 'Enabled',
+      cell: row => (
+        <Switch
+          checked={row.is_enabled}
+          disabled={toggleMutation.isPending}
+          onCheckedChange={checked => toggleMutation.mutate({ key: row.key, is_enabled: checked })}
+        />
+      ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      cell: row => (
+        <div className="flex justify-end">
+          <Button size="sm" variant="outline" onClick={() => openEdit(row)}>
+            <Pencil className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      ),
+    },
+  ]
+
+  return (
+    <div>
+      <p className="text-sm text-muted-foreground mb-4">
+        Configure how many points players earn or lose for each action. Disabled rules contribute 0 points.
+        Changes apply to future bookings only.
+      </p>
+      <DataTable columns={columns} data={rules} isLoading={isLoading} emptyMessage="No point rules found." />
+
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent className="overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Edit Point Rule</SheetTitle>
+          </SheetHeader>
+          {editTarget && (
+            <div className="mt-2 mb-4">
+              <code className="text-xs bg-muted px-2 py-1 rounded">{editTarget.key}</code>
+            </div>
+          )}
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField control={form.control} name="name_en" render={({ field }) => (
+                <FormItem><FormLabel>Name (English)</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="name_ar" render={({ field }) => (
+                <FormItem><FormLabel>Name (Arabic)</FormLabel><FormControl><Input dir="rtl" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="points" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Points</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      {...field}
+                      placeholder="Use negative value for deductions (e.g. -5)"
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">Use a negative value to deduct points (e.g. -10 for a red card).</p>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="is_enabled" render={({ field }) => (
+                <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <FormLabel className="text-sm font-medium">Enabled</FormLabel>
+                    <p className="text-xs text-muted-foreground">Disabled rules contribute 0 points</p>
+                  </div>
+                  <FormControl>
+                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                  </FormControl>
+                </FormItem>
+              )} />
+              <SheetFooter className="pt-4">
+                <Button type="button" variant="outline" onClick={() => setSheetOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? 'Saving...' : 'Save'}
+                </Button>
+              </SheetFooter>
+            </form>
+          </Form>
+        </SheetContent>
+      </Sheet>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function LoyaltyPage() {
@@ -406,12 +597,16 @@ export default function LoyaltyPage() {
         <TabsList>
           <TabsTrigger value="levels">Levels</TabsTrigger>
           <TabsTrigger value="rewards">Rewards</TabsTrigger>
+          <TabsTrigger value="point-rules">Point Rules</TabsTrigger>
         </TabsList>
         <TabsContent value="levels" className="mt-4">
           <LevelsTab />
         </TabsContent>
         <TabsContent value="rewards" className="mt-4">
           <RewardsTab />
+        </TabsContent>
+        <TabsContent value="point-rules" className="mt-4">
+          <PointRulesTab />
         </TabsContent>
       </Tabs>
     </div>

@@ -481,6 +481,24 @@ export interface CityPayload {
   is_enabled?: boolean
 }
 
+// ─── Point Rule ───────────────────────────────────────────────────────────────
+
+export interface PointRule {
+  key: string
+  name_ar: string
+  name_en: string
+  points: number
+  is_enabled: boolean
+  updated_at?: string
+}
+
+export interface PointRulePayload {
+  points?: number
+  is_enabled?: boolean
+  name_ar?: string
+  name_en?: string
+}
+
 // ─── Highlight ────────────────────────────────────────────────────────────────
 
 export interface Highlight {
