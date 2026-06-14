@@ -340,6 +340,10 @@ export interface Level {
   name_en: string
   min_points: number
   max_points: number
+  discount_percent: number
+  benefits_ar: string
+  benefits_en: string
+  card_type: string
 }
 
 export interface LevelPayload {
@@ -347,6 +351,10 @@ export interface LevelPayload {
   name_en: string
   min_points: number
   max_points: number
+  discount_percent: number
+  benefits_ar: string
+  benefits_en: string
+  card_type: string
 }
 
 // ─── Reward ───────────────────────────────────────────────────────────────────

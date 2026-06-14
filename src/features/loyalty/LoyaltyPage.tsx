@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import PageHeader from '@/components/shared/PageHeader'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
@@ -20,12 +22,18 @@ import type { ApiResponse, Level, LevelPayload, PointRule, PointRulePayload, Rew
 
 // ─── Levels Tab ───────────────────────────────────────────────────────────────
 
+const CARD_TYPES = ['standard', 'silver', 'gold', 'platinum'] as const
+
 const levelSchema = z
   .object({
     name_en: z.string().min(1, 'English name is required'),
     name_ar: z.string().min(1, 'Arabic name is required'),
     min_points: z.coerce.number().int().min(0, 'Must be ≥ 0'),
     max_points: z.coerce.number().int().min(1, 'Must be ≥ 1'),
+    discount_percent: z.coerce.number().min(0).max(100, 'Must be between 0 and 100'),
+    benefits_en: z.string().min(1, 'English benefits are required'),
+    benefits_ar: z.string().min(1, 'Arabic benefits are required'),
+    card_type: z.enum(CARD_TYPES, { required_error: 'Card type is required' }),
   })
   .refine(d => d.max_points > d.min_points, {
     message: 'Max points must be greater than min points',
@@ -49,7 +57,10 @@ function LevelsTab() {
 
   const form = useForm<LevelFormValues>({
     resolver: zodResolver(levelSchema),
-    defaultValues: { name_en: '', name_ar: '', min_points: 0, max_points: 0 },
+    defaultValues: {
+      name_en: '', name_ar: '', min_points: 0, max_points: 0,
+      discount_percent: 0, benefits_en: '', benefits_ar: '', card_type: 'standard',
+    },
   })
 
   function handleMutationError(err: unknown) {
@@ -60,6 +71,8 @@ function LevelsTab() {
       setOverlapError(
         'This point range overlaps with an existing level. Adjust min / max points and try again.'
       )
+    } else if (msg.toLowerCase().includes('discount_percent')) {
+      setOverlapError('Discount percent must be between 0 and 100.')
     } else {
       toast({ title: 'Failed to save level', variant: 'destructive' })
     }
@@ -99,7 +112,10 @@ function LevelsTab() {
   function openCreate() {
     setEditTarget(null)
     setOverlapError('')
-    form.reset({ name_en: '', name_ar: '', min_points: 0, max_points: 0 })
+    form.reset({
+      name_en: '', name_ar: '', min_points: 0, max_points: 0,
+      discount_percent: 0, benefits_en: '', benefits_ar: '', card_type: 'standard',
+    })
     setSheetOpen(true)
   }
 
@@ -111,6 +127,12 @@ function LevelsTab() {
       name_ar: level.name_ar,
       min_points: level.min_points,
       max_points: level.max_points,
+      discount_percent: level.discount_percent,
+      benefits_en: level.benefits_en,
+      benefits_ar: level.benefits_ar,
+      card_type: (CARD_TYPES.includes(level.card_type as typeof CARD_TYPES[number])
+        ? level.card_type
+        : 'standard') as typeof CARD_TYPES[number],
     })
     setSheetOpen(true)
   }
@@ -123,6 +145,13 @@ function LevelsTab() {
 
   const isBusy = createMutation.isPending || updateMutation.isPending
 
+  const cardTypeBadge: Record<string, string> = {
+    standard: 'bg-slate-100 text-slate-700',
+    silver:   'bg-gray-200 text-gray-700',
+    gold:     'bg-amber-100 text-amber-700',
+    platinum: 'bg-sky-100 text-sky-700',
+  }
+
   const columns: Column<Level>[] = [
     { key: 'name_en', header: 'Name', cell: row => <span className="font-medium">{row.name_en}</span> },
     { key: 'name_ar', header: 'Name (AR)', cell: row => <span dir="rtl" className="text-sm">{row.name_ar}</span> },
@@ -133,6 +162,24 @@ function LevelsTab() {
         <code className="text-xs bg-muted px-2 py-0.5 rounded">
           {row.min_points.toLocaleString()} – {row.max_points.toLocaleString()}
         </code>
+      ),
+    },
+    {
+      key: 'discount_percent',
+      header: 'Discount',
+      cell: row => (
+        <span className="text-sm font-medium text-green-600">
+          {row.discount_percent}%
+        </span>
+      ),
+    },
+    {
+      key: 'card_type',
+      header: 'Card',
+      cell: row => (
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${cardTypeBadge[row.card_type] ?? 'bg-muted text-muted-foreground'}`}>
+          {row.card_type}
+        </span>
       ),
     },
     {
@@ -196,6 +243,45 @@ function LevelsTab() {
                   </FormItem>
                 )} />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <FormField control={form.control} name="discount_percent" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Discount (%)</FormLabel>
+                    <FormControl><Input type="number" min="0" max="100" step="0.01" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="card_type" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Card Type</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {CARD_TYPES.map(t => (
+                          <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+              <FormField control={form.control} name="benefits_en" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Benefits (English)</FormLabel>
+                  <FormControl><Textarea rows={2} placeholder="e.g. 10% discount on match bookings" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="benefits_ar" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Benefits (Arabic)</FormLabel>
+                  <FormControl><Textarea dir="rtl" rows={2} placeholder="مثال: خصم 10% على حجز المباريات" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
               <SheetFooter className="pt-4">
                 <Button type="button" variant="outline" onClick={() => setSheetOpen(false)}>Cancel</Button>
                 <Button type="submit" disabled={isBusy}>{isBusy ? 'Saving...' : 'Save'}</Button>
