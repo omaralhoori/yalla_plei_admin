@@ -123,6 +123,13 @@ export interface PitchPayload {
 
 // ─── Cancellation Policy ─────────────────────────────────────────────────────
 
+export interface PolicyRefundTier {
+  id?: string
+  policy_id?: string
+  hours_before: number
+  refund_percent: number
+}
+
 export interface CancellationPolicy {
   id: string
   name: string
@@ -130,6 +137,7 @@ export interface CancellationPolicy {
   description_en: string
   cancel_before_hours: number
   is_default: boolean
+  refund_tiers?: PolicyRefundTier[]
 }
 
 export interface PolicyPayload {
@@ -138,6 +146,7 @@ export interface PolicyPayload {
   description_en: string
   cancel_before_hours: number
   is_default: boolean
+  refund_tiers: PolicyRefundTier[]
 }
 
 // ─── Match ───────────────────────────────────────────────────────────────────

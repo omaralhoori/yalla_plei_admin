@@ -1,9 +1,12 @@
 # Yalla Plei — Admin API Documentation
 
 > **Base URL**: `https://api.yallaplei.com/api/v1`  
-> **Version**: 3.7.0  
+> **Version**: 3.8.0  
 > **Audience**: Admin panel / back-office (role = `admin` or `manager`)  
 > **Last Updated**: 2026-06-17
+
+### What's New in 3.8.0
+- **Tiered cancellation refunds**: cancellation policies now carry a `refund_tiers` schedule (refund % by hours-before-kickoff) managed via the policy endpoints. Refunds at cancellation apply the matching tier automatically.
 
 ### What's New in 3.7.0
 - **Audit trail** on all tables: `created_at`, `updated_at`, `created_by`, `updated_by` (stamped automatically from the authenticated admin/user).
@@ -80,7 +83,8 @@ Obtain a Custom JWT the same way players do:
 | **User** | Additionally references `country_id`/`city_id` |
 | **WalletTransaction** | Belongs to User (positive = credit, negative = debit) |
 | **FinancialTransaction** | Belongs to User+Match+Booking |
-| **Policy** | Cancellation policy; one can be marked default |
+| **Policy** | Cancellation policy; one can be marked default. Has many `PolicyRefundTier` (tiered refund schedule) |
+| **PolicyRefundTier** | Belongs to Policy. `hours_before` + `refund_percent`: refunds a % of the paid amount based on hours remaining before kickoff |
 | **Level** | Assigned by points range. Perks: `discount_percent` (auto-applied to match join price), `benefits_ar`/`benefits_en`. Player card: `card_type` identifier (e.g. `"gold"`) — the app renders the matching card design |
 | **PointRule** | Admin-tunable scoring rule (`key`, `points`, `is_enabled`). Defines how players earn/lose points |
 | **PlayerProfile** | Belongs to User+Sport+Level. `total_points` and `preferred_position` are per-sport; `total_points` drives the level |
@@ -418,6 +422,32 @@ Creates a city under a country.
 
 ## Cancellation Policies Management
 
+A cancellation policy now supports a **tiered refund schedule**: instead of a single
+deadline, you define multiple `refund_tiers`, each granting a percentage of the amount
+the player paid depending on how many hours remain before kickoff.
+
+### How tiers are applied
+
+Each tier has an `hours_before` threshold and a `refund_percent` (0–100). When a player
+cancels, the system computes the hours remaining until the match and selects the tier
+with the **largest `hours_before` that does not exceed** the hours remaining. If no tier
+qualifies (the player cancelled too late), **no refund** is issued.
+
+**Example** — tiers `[{8, 100}, {4, 50}, {2, 20}]` produce:
+
+| Time of cancellation | Refund |
+|----------------------|--------|
+| More than 8 hours before the match | 100% |
+| Between 8 and 4 hours before | 50% |
+| Between 4 and 2 hours before | 20% |
+| Less than 2 hours before | 0% (no refund) |
+
+> The refund percentage is applied to `price_paid` (the amount actually charged, after any
+> level discount) and credited to the player's wallet.
+
+> **Legacy fallback:** if a policy has an **empty** `refund_tiers` array, the legacy
+> `cancel_before_hours` single deadline is used (100% before it, 0% after).
+
 ### `GET /api/v1/admin/policies`
 **Auth**: admin or manager
 
@@ -432,11 +462,17 @@ Creates a city under a country.
       "description_ar": "...",
       "description_en": "...",
       "cancel_before_hours": 24,
-      "is_default": true
+      "is_default": true,
+      "refund_tiers": [
+        { "id": "uuid", "policy_id": "uuid", "hours_before": 8, "refund_percent": 100 },
+        { "id": "uuid", "policy_id": "uuid", "hours_before": 4, "refund_percent": 50 },
+        { "id": "uuid", "policy_id": "uuid", "hours_before": 2, "refund_percent": 20 }
+      ]
     }
   ]
 }
 ```
+> `refund_tiers` are returned sorted by `hours_before` descending.
 
 ---
 
@@ -447,25 +483,52 @@ Creates a city under a country.
 ```json
 {
   "name": "Flexible",
-  "description_ar": "إلغاء مجاني",
-  "description_en": "Free cancellation",
-  "cancel_before_hours": 48,
-  "is_default": false
+  "description_ar": "إلغاء مرن",
+  "description_en": "Flexible cancellation",
+  "cancel_before_hours": 8,
+  "is_default": false,
+  "refund_tiers": [
+    { "hours_before": 8, "refund_percent": 100 },
+    { "hours_before": 4, "refund_percent": 50 },
+    { "hours_before": 2, "refund_percent": 20 }
+  ]
 }
 ```
 
-**Response** `201`: created policy.
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | ✅ | Unique policy name |
+| `description_ar` / `description_en` | string | ❌ | Localized descriptions |
+| `cancel_before_hours` | int | ❌ | Legacy single-deadline fallback (used only when `refund_tiers` is empty) |
+| `is_default` | bool | ❌ | Mark as the default policy applied to matches without an explicit policy |
+| `refund_tiers` | array | ❌ | Tiered refund schedule (see below). Omit/empty to use the legacy deadline |
+| `refund_tiers[].hours_before` | int | ✅ | Hours before kickoff this tier starts applying (≥ 0) |
+| `refund_tiers[].refund_percent` | float | ✅ | Percentage refunded (0–100) |
+
+**Response** `201`: created policy (with generated tier IDs).
+
+**Errors**:
+| Status | Error |
+|--------|-------|
+| `400` | `hours_before must be zero or greater` |
+| `400` | `refund_percent must be between 0 and 100` |
+| `400` | `duplicate hours_before value in refund_tiers` |
+| `409` | `a record with this name already exists` |
 
 ---
 
 ### `PUT /api/v1/admin/policies/:id`
-**Request Body**: same as POST.  
+**Request Body**: same as POST. The supplied `refund_tiers` array **fully replaces** the
+existing tiers (send the complete desired set; an empty array clears them).  
 **Response** `200`: updated policy.
+
+**Errors**: same validation errors as POST.
 
 ---
 
 ### `DELETE /api/v1/admin/policies/:id`
-**Response** `200`: `{ "message": "policy deleted" }`
+**Response** `200`: `{ "message": "policy deleted" }`  
+> Deleting a policy also removes its refund tiers (cascade).
 
 ---
 

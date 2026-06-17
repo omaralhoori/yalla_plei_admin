@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useForm } from 'react-hook-form'
+import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, Construction, Hourglass, Landmark } from 'lucide-react'
+import { Plus, Pencil, Trash2, Construction, Hourglass, Landmark, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -25,15 +25,42 @@ import type { ApiResponse, CancellationPolicy, PolicyPayload, AppSetting } from 
 const WAITLIST_OFFER_KEY = 'waitlist_offer_duration_minutes'
 const DEPOSIT_INSTRUCTIONS_KEY = 'deposit_instructions'
 
+const refundTierSchema = z.object({
+  hours_before: z.coerce.number().int('Whole number').min(0, 'Must be 0 or more'),
+  refund_percent: z.coerce.number().min(0, 'Min 0').max(100, 'Max 100'),
+})
+
 const policySchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description_en: z.string().min(1, 'English description is required'),
   description_ar: z.string().min(1, 'Arabic description is required'),
   cancel_before_hours: z.coerce.number().int().min(0, 'Must be 0 or more hours'),
   is_default: z.boolean(),
+  refund_tiers: z.array(refundTierSchema),
+}).superRefine((val, ctx) => {
+  const seen = new Map<number, number>()
+  val.refund_tiers.forEach((tier, index) => {
+    if (seen.has(tier.hours_before)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Duplicate hours-before value',
+        path: ['refund_tiers', index, 'hours_before'],
+      })
+    }
+    seen.set(tier.hours_before, index)
+  })
 })
 
 type PolicyFormValues = z.infer<typeof policySchema>
+
+const DEFAULT_POLICY_VALUES: PolicyFormValues = {
+  name: '',
+  description_en: '',
+  description_ar: '',
+  cancel_before_hours: 24,
+  is_default: false,
+  refund_tiers: [],
+}
 
 function PoliciesTab() {
   const qc = useQueryClient()
@@ -49,8 +76,10 @@ function PoliciesTab() {
 
   const form = useForm<PolicyFormValues>({
     resolver: zodResolver(policySchema),
-    defaultValues: { name: '', description_en: '', description_ar: '', cancel_before_hours: 24, is_default: false },
+    defaultValues: DEFAULT_POLICY_VALUES,
   })
+
+  const tiers = useFieldArray({ control: form.control, name: 'refund_tiers' })
 
   const createMutation = useMutation({
     mutationFn: (payload: PolicyPayload) => api.post('/admin/policies', payload),
@@ -70,15 +99,27 @@ function PoliciesTab() {
     onError: () => toast({ title: 'Failed to delete policy', variant: 'destructive' }),
   })
 
-  function openCreate() { setEditTarget(null); form.reset(); setSheetOpen(true) }
+  function openCreate() { setEditTarget(null); form.reset(DEFAULT_POLICY_VALUES); setSheetOpen(true) }
   function openEdit(p: CancellationPolicy) {
     setEditTarget(p)
-    form.reset({ name: p.name, description_en: p.description_en, description_ar: p.description_ar, cancel_before_hours: p.cancel_before_hours, is_default: p.is_default })
+    form.reset({
+      name: p.name,
+      description_en: p.description_en,
+      description_ar: p.description_ar,
+      cancel_before_hours: p.cancel_before_hours,
+      is_default: p.is_default,
+      refund_tiers: (p.refund_tiers ?? []).map(t => ({ hours_before: t.hours_before, refund_percent: t.refund_percent })),
+    })
     setSheetOpen(true)
   }
   function onSubmit(v: PolicyFormValues) {
-    if (editTarget) updateMutation.mutate({ id: editTarget.id, payload: v })
-    else createMutation.mutate(v)
+    // Send tiers ordered by hours_before descending to match how the API returns them.
+    const payload: PolicyPayload = {
+      ...v,
+      refund_tiers: [...v.refund_tiers].sort((a, b) => b.hours_before - a.hours_before),
+    }
+    if (editTarget) updateMutation.mutate({ id: editTarget.id, payload })
+    else createMutation.mutate(payload)
   }
 
   const isBusy = createMutation.isPending || updateMutation.isPending
@@ -86,7 +127,30 @@ function PoliciesTab() {
   const columns: Column<CancellationPolicy>[] = [
     { key: 'name', header: 'Name', cell: row => <div className="font-medium">{row.name}{row.is_default && <Badge variant="secondary" className="ml-2 text-xs">Default</Badge>}</div> },
     { key: 'desc', header: 'Description', cell: row => <span className="text-sm text-muted-foreground">{row.description_en}</span> },
-    { key: 'hours', header: 'Cancel Before', cell: row => <span>{row.cancel_before_hours} hour{row.cancel_before_hours !== 1 ? 's' : ''}</span> },
+    {
+      key: 'tiers',
+      header: 'Refund Tiers',
+      cell: row => {
+        const t = row.refund_tiers ?? []
+        if (t.length === 0) {
+          return (
+            <span className="text-xs text-muted-foreground">
+              Legacy — 100% before {row.cancel_before_hours}h
+            </span>
+          )
+        }
+        return (
+          <div className="flex flex-wrap gap-1.5">
+            {[...t].sort((a, b) => b.hours_before - a.hours_before).map((tier, i) => (
+              <Badge key={i} variant="outline" className="font-normal gap-1">
+                <Clock className="w-3 h-3" />
+                {tier.hours_before}h → {tier.refund_percent}%
+              </Badge>
+            ))}
+          </div>
+        )
+      },
+    },
     {
       key: 'actions',
       header: '',
@@ -107,7 +171,7 @@ function PoliciesTab() {
       <DataTable columns={columns} data={policies} isLoading={isLoading} />
 
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent>
+        <SheetContent className="overflow-y-auto">
           <SheetHeader><SheetTitle>{editTarget ? 'Edit Policy' : 'Add Policy'}</SheetTitle></SheetHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 space-y-4">
@@ -120,8 +184,74 @@ function PoliciesTab() {
               <FormField control={form.control} name="description_ar" render={({ field }) => (
                 <FormItem><FormLabel>Description (Arabic)</FormLabel><FormControl><Input dir="rtl" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
+              {/* ── Refund tiers ─────────────────────────────────────────── */}
+              <div className="space-y-3 rounded-lg border p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <Label className="text-sm font-medium">Refund Tiers</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Refund % based on hours remaining before kickoff. The tier with the largest
+                      hours-before that doesn't exceed the time left applies.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0 gap-1"
+                    onClick={() => tiers.append({ hours_before: 0, refund_percent: 0 })}
+                  >
+                    <Plus className="w-3.5 h-3.5" />Add tier
+                  </Button>
+                </div>
+
+                {tiers.fields.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic">
+                    No tiers — the legacy single deadline below will be used (100% before it, 0% after).
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex gap-2 px-1 text-[11px] font-medium text-muted-foreground">
+                      <span className="flex-1">Hours before kickoff</span>
+                      <span className="flex-1">Refund %</span>
+                      <span className="w-8" />
+                    </div>
+                    {tiers.fields.map((tierField, index) => (
+                      <div key={tierField.id} className="flex items-start gap-2">
+                        <FormField control={form.control} name={`refund_tiers.${index}.hours_before`} render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormControl><Input type="number" min="0" step="1" placeholder="e.g. 8" {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <FormField control={form.control} name={`refund_tiers.${index}.refund_percent`} render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormControl><Input type="number" min="0" max="100" step="1" placeholder="0–100" {...field} /></FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )} />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="text-destructive shrink-0"
+                          onClick={() => tiers.remove(index)}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <FormField control={form.control} name="cancel_before_hours" render={({ field }) => (
-                <FormItem><FormLabel>Cancel Before (hours)</FormLabel><FormControl><Input type="number" min="0" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem>
+                  <FormLabel>Legacy Deadline (hours)</FormLabel>
+                  <FormControl><Input type="number" min="0" {...field} /></FormControl>
+                  <p className="text-xs text-muted-foreground">Used only when no refund tiers are defined above.</p>
+                  <FormMessage />
+                </FormItem>
               )} />
               <FormField control={form.control} name="is_default" render={({ field }) => (
                 <FormItem className="flex items-center gap-3">
