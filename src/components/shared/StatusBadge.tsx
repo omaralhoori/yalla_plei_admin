@@ -13,6 +13,9 @@ const statusConfig = {
   offered: { label: 'Offered', variant: 'warning' as const },
   accepted: { label: 'Accepted', variant: 'success' as const },
   expired: { label: 'Expired', variant: 'destructive' as const },
+  create: { label: 'Create', variant: 'success' as const },
+  update: { label: 'Update', variant: 'warning' as const },
+  delete: { label: 'Delete', variant: 'destructive' as const },
   true: { label: 'Yes', variant: 'success' as const },
   false: { label: 'No', variant: 'secondary' as const },
 } as const

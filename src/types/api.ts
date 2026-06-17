@@ -507,6 +507,23 @@ export interface PointRulePayload {
   name_en?: string
 }
 
+// ─── Audit Log ────────────────────────────────────────────────────────────────
+
+export type AuditAction = 'create' | 'update' | 'delete'
+
+// The system/automated actor UUID — rendered as "system" by the API.
+export const SYSTEM_ACTOR_ID = '00000000-0000-0000-0000-000000000001'
+
+export interface AuditLog {
+  id: string
+  table_name: string
+  record_id: string
+  action: AuditAction
+  actor_id: string
+  actor_name: string
+  created_at: string
+}
+
 // ─── Highlight ────────────────────────────────────────────────────────────────
 
 export interface Highlight {
