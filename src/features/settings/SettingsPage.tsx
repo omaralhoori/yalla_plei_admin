@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, Construction, Hourglass, Landmark, Clock } from 'lucide-react'
+import { Plus, Pencil, Trash2, Construction, Hourglass, Landmark, Clock, MessageSquareText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -24,6 +24,7 @@ import type { ApiResponse, CancellationPolicy, PolicyPayload, AppSetting } from 
 
 const WAITLIST_OFFER_KEY = 'waitlist_offer_duration_minutes'
 const DEPOSIT_INSTRUCTIONS_KEY = 'deposit_instructions'
+const REGISTRATION_INSTRUCTIONS_KEY = 'registration_instructions'
 
 const refundTierSchema = z.object({
   hours_before: z.coerce.number().int('Whole number').min(0, 'Must be 0 or more'),
@@ -444,6 +445,86 @@ function DepositInstructionsTab() {
   )
 }
 
+// ─── Registration instructions settings ────────────────────────────────────
+
+const registrationSchema = z.object({
+  instructions: z.string(),
+})
+type RegistrationFormValues = z.infer<typeof registrationSchema>
+
+function RegistrationInstructionsTab() {
+  const qc = useQueryClient()
+  const { toast } = useToast()
+
+  const { data: settings = [], isLoading } = useQuery({
+    queryKey: ['admin-settings'],
+    queryFn: async () => (await api.get<ApiResponse<AppSetting[]>>('/admin/settings')).data.data,
+  })
+
+  const current = settings.find(s => s.key === REGISTRATION_INSTRUCTIONS_KEY)
+  const currentValue = current?.value ?? ''
+
+  const form = useForm<RegistrationFormValues>({
+    resolver: zodResolver(registrationSchema),
+    values: { instructions: currentValue },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: (payload: { instructions: string }) =>
+      api.put('/admin/settings/registration-instructions', payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-settings'] })
+      toast({ title: 'Registration instructions updated', variant: 'success' as never })
+    },
+    onError: () => toast({ title: 'Failed to update instructions', variant: 'destructive' }),
+  })
+
+  function onSubmit(v: RegistrationFormValues) {
+    updateMutation.mutate({ instructions: v.instructions })
+  }
+
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <MessageSquareText className="w-4 h-4" />
+          Registration Instructions
+        </CardTitle>
+        <CardDescription>
+          Shown to players before they reserve a seat in the reserve-now / pay-later flow — the payment
+          steps and where to send the transfer receipt (e.g. your company WhatsApp number). Leave empty to clear it.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Skeleton className="h-28 w-full" />
+        ) : (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField control={form.control} name="instructions" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Message to players</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      rows={5}
+                      placeholder="e.g. Reserve your seat, transfer the amount to IBAN JO00 0000 0000, then send the receipt to WhatsApp +962 7 0000 0000 for confirmation."
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <Button type="submit" disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? 'Saving…' : 'Save'}
+              </Button>
+            </form>
+          </Form>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 function ComingSoonTab({ label }: { label: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground gap-3">
@@ -463,12 +544,14 @@ export default function SettingsPage() {
           <TabsTrigger value="policies">Cancellation Policies</TabsTrigger>
           <TabsTrigger value="waitlist">Waitlist</TabsTrigger>
           <TabsTrigger value="deposit">Deposit Instructions</TabsTrigger>
+          <TabsTrigger value="registration">Registration Instructions</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="app">App Config</TabsTrigger>
         </TabsList>
         <TabsContent value="policies"><PoliciesTab /></TabsContent>
         <TabsContent value="waitlist"><WaitlistTab /></TabsContent>
         <TabsContent value="deposit"><DepositInstructionsTab /></TabsContent>
+        <TabsContent value="registration"><RegistrationInstructionsTab /></TabsContent>
         <TabsContent value="notifications"><ComingSoonTab label="Notification" /></TabsContent>
         <TabsContent value="app"><ComingSoonTab label="App" /></TabsContent>
       </Tabs>

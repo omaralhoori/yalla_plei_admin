@@ -385,7 +385,7 @@ export interface RewardPayload {
 
 // ─── Booking ──────────────────────────────────────────────────────────────────
 
-export type BookingStatus = 'confirmed' | 'cancelled' | 'pending' | 'completed' | 'pending_payment' | 'waitlist'
+export type BookingStatus = 'confirmed' | 'cancelled' | 'pending' | 'completed' | 'pending_payment' | 'pending_approval' | 'waitlist'
 
 export interface AdminBooking {
   id: string
@@ -412,6 +412,10 @@ export interface AdminBooking {
 
 export interface CancelBookingPayload {
   refund: boolean
+}
+
+export interface RejectBookingPayload {
+  reason?: string
 }
 
 // ─── Waitlist ─────────────────────────────────────────────────────────────────

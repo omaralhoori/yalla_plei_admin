@@ -1,9 +1,12 @@
 # Yalla Plei — Admin API Documentation
 
 > **Base URL**: `https://api.yallaplei.com/api/v1`  
-> **Version**: 3.8.0  
+> **Version**: 3.9.0  
 > **Audience**: Admin panel / back-office (role = `admin` or `manager`)  
-> **Last Updated**: 2026-06-17
+> **Last Updated**: 2026-06-18
+
+### What's New in 3.9.0
+- **Reserve now, pay later** approval workflow: players can reserve a seat instantly (status `pending_approval`) and pay off-platform. New endpoints to **approve** (`POST /admin/bookings/:id/approve`) or **reject/remove** (`POST /admin/bookings/:id/reject`) reservations, plus an admin-defined registration message (`PUT /admin/settings/registration-instructions`). Players are notified at each step (reserved, approved, removed).
 
 ### What's New in 3.8.0
 - **Tiered cancellation refunds**: cancellation policies now carry a `refund_tiers` schedule (refund % by hours-before-kickoff) managed via the policy endpoints. Refunds at cancellation apply the matching tier automatically.
@@ -1061,11 +1064,13 @@ Returns all bookings with optional filters.
 |-----------|------|-------------|
 | `user_id` | UUID | Filter by player |
 | `match_id` | UUID | Filter by match |
-| `status` | string | `"pending_payment"`, `"confirmed"`, `"cancelled"`, `"waitlist"` |
+| `status` | string | `"pending_payment"`, `"pending_approval"`, `"confirmed"`, `"cancelled"`, `"waitlist"` |
 | `limit` | int | Default 20 |
 | `offset` | int | Default 0 |
 
 **Response** `200`: paginated list including player, match, pitch, sport details.
+
+> Use `status=pending_approval` to list reserve-now/pay-later reservations awaiting review.
 
 ---
 
@@ -1090,6 +1095,70 @@ Admin-forced cancellation.
 > **Points side-effect:** any points the booking had earned (booking bonus,
 > attendance, goals, …) are revoked automatically; the deduction appears in the
 > player's points history.
+
+---
+
+## Reserve Now, Pay Later — Approval Workflow (Admin)
+
+Players can reserve a seat instantly (status `pending_approval`) without paying in-app,
+then transfer the amount and send the receipt to the company WhatsApp. The seat counts
+toward match capacity while it awaits review. Use the endpoints below to confirm or remove
+the reservation. **The player is notified by push at each step.**
+
+> Set the message players read before reserving (payment steps + WhatsApp number) via
+> [`PUT /admin/settings/registration-instructions`](#put-apiv1adminsettingsregistration-instructions).
+
+> 💡 List pending reservations with `GET /api/v1/admin/bookings?status=pending_approval`.
+
+### `POST /api/v1/admin/bookings/:id/approve`
+**Auth**: admin or manager  
+Confirms a reserved booking after verifying the off-platform payment.
+
+**Path Parameter**: `:id` — UUID of the booking (must be `pending_approval`)
+
+**Response** `200`: the booking with `status: "confirmed"` and `price_paid` set (after any
+level discount).
+
+**Effects**:
+- Records an `external` financial transaction for the paid amount.
+- Awards the `booking_paid` points (admin-configured, default 5).
+- Sends a "Booking Approved!" push to the player.
+
+**Error Responses**:
+| Status | Error |
+|--------|-------|
+| `404` | `booking not found` |
+| `409` | `booking is not awaiting approval` — not in `pending_approval` state |
+| `409` | `match is full` — every seat was confirmed by others in the meantime |
+
+---
+
+### `POST /api/v1/admin/bookings/:id/reject`
+**Auth**: admin or manager  
+Removes a reserved booking that was never paid for, freeing the seat for other players.
+
+**Path Parameter**: `:id` — UUID of the booking (must be `pending_approval`)
+
+**Request Body** (optional):
+```json
+{ "reason": "No payment received within the allowed time." }
+```
+
+| Field | Description |
+|-------|-------------|
+| `reason` | Optional. Included in the player's "Reservation Removed" notification |
+
+**Response** `200`: the booking with `status: "cancelled"`.
+
+**Effects**:
+- Frees the seat; the first eligible waitlisted player is offered the spot.
+- Sends a "Reservation Removed" push to the player (with the reason if provided).
+
+**Error Responses**:
+| Status | Error |
+|--------|-------|
+| `404` | `booking not found` |
+| `409` | `booking is not awaiting approval` |
 
 ---
 
@@ -1234,6 +1303,31 @@ company's bank account details. Players read it via `GET /api/v1/wallet/deposit-
 {
   "success": true,
   "data": { "key": "deposit_instructions", "value": "Transfer the amount to ..." }
+}
+```
+
+---
+
+### `PUT /api/v1/admin/settings/registration-instructions`
+**Auth**: admin or manager  
+Sets the message a player reads **before reserving a seat** in the reserve-now/pay-later
+flow — payment steps and where to send the transfer receipt (e.g. the company WhatsApp
+number). Players read it via `GET /api/v1/bookings/registration-instructions`.
+
+**Request Body**:
+```json
+{ "instructions": "Reserve your seat, transfer the amount to IBAN JO00 0000 0000, then send the receipt to WhatsApp +962 7 0000 0000 for confirmation." }
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `instructions` | string | ❌ | The message text. Pass an empty string to clear it |
+
+**Response** `200`:
+```json
+{
+  "success": true,
+  "data": { "key": "registration_instructions", "value": "Reserve your seat, transfer ..." }
 }
 ```
 
