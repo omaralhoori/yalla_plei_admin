@@ -99,6 +99,11 @@ export default function BookingsPage() {
         <div>
           <div className="font-medium text-sm">{row.player ? `${row.player.first_name} ${row.player.last_name}` : 'Unknown'}</div>
           <div className="text-xs text-muted-foreground">{row.player?.email}</div>
+          {row.player?.phone && (
+            <a href={`tel:${row.player.phone}`} className="text-xs text-primary hover:underline" dir="ltr">
+              {row.player.phone}
+            </a>
+          )}
         </div>
       ),
       csvValue: row => row.player ? `${row.player.first_name} ${row.player.last_name}` : '',

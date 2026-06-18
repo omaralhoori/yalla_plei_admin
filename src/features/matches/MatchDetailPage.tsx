@@ -6,23 +6,26 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import {
   ArrowLeft, Calendar, MapPin, Users, DollarSign,
-  Clock, ShieldCheck, BarChart3, Film, Hourglass,
+  Clock, ShieldCheck, BarChart3, Film, Hourglass, Check, X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import StatusBadge from '@/components/shared/StatusBadge'
+import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import ImageUpload from '@/components/shared/ImageUpload'
 import { useToast } from '@/hooks/use-toast'
 import { api } from '@/lib/api'
 import { formatCurrency, formatDateTime, formatDate, matchApiToUtcIso, formatMatchEndTime } from '@/lib/utils'
-import type { ApiResponse, PaginatedResponse, Match, AdminBooking, HighlightPayload, Sport, WaitlistEntry } from '@/types/api'
+import type { ApiResponse, PaginatedResponse, Match, AdminBooking, HighlightPayload, Sport, WaitlistEntry, RejectBookingPayload } from '@/types/api'
 
 // ─── Highlight form schema (match_id injected at submit time, not in form) ────
 
@@ -79,6 +82,9 @@ export default function MatchDetailPage() {
   const qc = useQueryClient()
   const { toast } = useToast()
   const [highlightOpen, setHighlightOpen] = useState(false)
+  const [approveTarget, setApproveTarget] = useState<AdminBooking | null>(null)
+  const [rejectTarget, setRejectTarget] = useState<AdminBooking | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
 
   // ─── Match ───────────────────────────────────────────────────────────────────
 
@@ -148,6 +154,39 @@ export default function MatchDetailPage() {
     onError: () => toast({ title: 'Failed to add highlight', variant: 'destructive' }),
   })
 
+  // ─── Reserve-now / pay-later approval ─────────────────────────────────────────
+
+  const approveMutation = useMutation({
+    mutationFn: (bookingId: string) => api.post(`/admin/bookings/${bookingId}/approve`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['match-bookings', id] })
+      qc.invalidateQueries({ queryKey: ['match-waitlist', id] })
+      toast({ title: 'Reservation approved — seat confirmed', variant: 'success' as never })
+      setApproveTarget(null)
+    },
+    onError: () => toast({ title: 'Failed to approve reservation', variant: 'destructive' }),
+  })
+
+  const rejectMutation = useMutation({
+    mutationFn: ({ bookingId, payload }: { bookingId: string; payload: RejectBookingPayload }) =>
+      api.post(`/admin/bookings/${bookingId}/reject`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['match-bookings', id] })
+      qc.invalidateQueries({ queryKey: ['match-waitlist', id] })
+      toast({ title: 'Reservation removed — seat freed', variant: 'success' as never })
+      setRejectTarget(null)
+    },
+    onError: () => toast({ title: 'Failed to remove reservation', variant: 'destructive' }),
+  })
+
+  function openReject(b: AdminBooking) {
+    setRejectTarget(b)
+    setRejectReason('')
+  }
+
+  const playerName = (b: AdminBooking | null) =>
+    b?.player ? `${b.player.first_name} ${b.player.last_name}` : 'this player'
+
   function onHighlightSubmit(values: HighlightFormValues) {
     if (!id) return
     const payload: HighlightPayload = {
@@ -193,6 +232,11 @@ export default function MatchDetailPage() {
         <div>
           <div className="font-medium text-sm">{row.player ? `${row.player.first_name} ${row.player.last_name}` : 'Unknown'}</div>
           <div className="text-xs text-muted-foreground">{row.player?.email}</div>
+          {row.player?.phone && (
+            <a href={`tel:${row.player.phone}`} className="text-xs text-primary hover:underline" dir="ltr">
+              {row.player.phone}
+            </a>
+          )}
         </div>
       ),
     },
@@ -210,6 +254,32 @@ export default function MatchDetailPage() {
       key: 'booked_at',
       header: 'Booked At',
       cell: row => <span className="text-sm text-muted-foreground">{formatDateTime(row.date_time)}</span>,
+    },
+    {
+      key: 'actions',
+      header: '',
+      cell: row => row.status === 'pending_approval' ? (
+        <div className="flex gap-2 justify-end">
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 text-xs text-emerald-600 hover:text-emerald-600"
+            onClick={() => setApproveTarget(row)}
+          >
+            <Check className="w-3.5 h-3.5" />
+            Approve
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 text-xs text-destructive hover:text-destructive"
+            onClick={() => openReject(row)}
+          >
+            <X className="w-3.5 h-3.5" />
+            Reject
+          </Button>
+        </div>
+      ) : null,
     },
   ]
 
@@ -438,6 +508,61 @@ export default function MatchDetailPage() {
           </Form>
         </SheetContent>
       </Sheet>
+
+      {/* Approve reservation (reserve-now / pay-later) */}
+      <ConfirmDialog
+        open={!!approveTarget}
+        title="Approve Reservation"
+        description={
+          <span>
+            Confirm the seat for <strong>{playerName(approveTarget)}</strong> after verifying the
+            off-platform payment of <strong>{formatCurrency(approveTarget?.match?.join_price ?? match?.join_price ?? 0)}</strong>.
+            This records an external transaction, awards points, and notifies the player.
+          </span>
+        }
+        confirmLabel="Approve & Confirm"
+        variant="default"
+        isLoading={approveMutation.isPending}
+        onConfirm={() => approveTarget && approveMutation.mutate(approveTarget.id)}
+        onCancel={() => setApproveTarget(null)}
+      />
+
+      {/* Reject / remove reservation */}
+      <Dialog open={!!rejectTarget} onOpenChange={open => !open && setRejectTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Reservation</DialogTitle>
+            <DialogDescription>
+              This removes <strong>{playerName(rejectTarget)}</strong>&apos;s reservation and frees the seat
+              for the next player. The player is notified — add an optional reason to include in the notification.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="reject-reason">Reason (optional)</Label>
+            <Textarea
+              id="reject-reason"
+              rows={3}
+              placeholder="e.g. No payment received within the allowed time."
+              value={rejectReason}
+              onChange={e => setRejectReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRejectTarget(null)} disabled={rejectMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              className="gap-1.5"
+              disabled={rejectMutation.isPending}
+              onClick={() => rejectTarget && rejectMutation.mutate({ bookingId: rejectTarget.id, payload: { reason: rejectReason.trim() || undefined } })}
+            >
+              <X className="w-4 h-4" />
+              {rejectMutation.isPending ? 'Removing…' : 'Remove Reservation'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
