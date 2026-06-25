@@ -49,6 +49,7 @@ const LoyaltyPage = lazy(() => import('@/features/loyalty/LoyaltyPage'))
 const HighlightsPage = lazy(() => import('@/features/highlights/HighlightsPage'))
 const CountriesPage = lazy(() => import('@/features/locations/CountriesPage'))
 const AuditLogsPage = lazy(() => import('@/features/audit/AuditLogsPage'))
+const RentalsPage = lazy(() => import('@/features/rentals/RentalsPage'))
 
 function ProtectedRoute() {
   if (!isAuthenticated()) {
@@ -99,6 +100,7 @@ export const router = createBrowserRouter([
       { path: '/loyalty', element: <LoyaltyPage />, errorElement: <PageError /> },
       { path: '/highlights', element: <HighlightsPage />, errorElement: <PageError /> },
       { path: '/countries', element: <CountriesPage />, errorElement: <PageError /> },
+      { path: '/rentals', element: <RentalsPage />, errorElement: <PageError /> },
       { path: '/audit-logs', element: <AuditLogsPage />, errorElement: <PageError /> },
       { path: '/settings', element: <SettingsPage />, errorElement: <PageError /> },
     ],

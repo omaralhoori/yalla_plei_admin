@@ -1,9 +1,12 @@
 # Yalla Plei — Admin API Documentation
 
 > **Base URL**: `https://api.yallaplei.com/api/v1`  
-> **Version**: 3.9.0  
+> **Version**: 3.10.0  
 > **Audience**: Admin panel / back-office (role = `admin` or `manager`)  
-> **Last Updated**: 2026-06-18
+> **Last Updated**: 2026-06-25
+
+### What's New in 3.10.0
+- **Pitch rental (new section)**: manage rentable pitches independent of match pitches — set per-weekday opening hours, slotting rules (30-min slots; 1h/1.5h/2h bookings), price-per-hour, services and a cancellation policy (`POST/PUT/DELETE /admin/rental-pitches`). **Block a slot** when a pitch is booked off-platform (`POST /admin/rental-pitches/:id/block`), browse all rental bookings (`GET /admin/rental-bookings`), and cancel/refund or unblock (`POST /admin/rental-bookings/:id/cancel`). Each pitch tracks an aggregated rating (1–5, only from players who rented it) and a cumulative `booking_count`.
 
 ### What's New in 3.9.0
 - **Reserve now, pay later** approval workflow: players can reserve a seat instantly (status `pending_approval`) and pay off-platform. New endpoints to **approve** (`POST /admin/bookings/:id/approve`) or **reject/remove** (`POST /admin/bookings/:id/reject`) reservations, plus an admin-defined registration message (`PUT /admin/settings/registration-instructions`). Players are notified at each step (reserved, approved, removed).
@@ -1621,6 +1624,114 @@ GET /api/v1/admin/audit-logs?actor_id=system&from=2026-06-17
 
 ---
 
+## Pitch Rental
+
+A standalone rental system, separate from match pitches (separate table and endpoints).
+A rentable pitch publishes a **weekly schedule** (per-weekday opening windows), is priced
+**per hour**, and has its day split into fixed **slots** (default 30 minutes). Players book
+a continuous block between `min_duration_minutes` and `max_duration_minutes` (default 1h–2h)
+and **bookings can never overlap** (always 1h / 1.5h / 2h). Each pitch can use its own
+**cancellation policy** and carries an aggregated **rating** (1–5, submitted only by players
+who rented it) plus a cumulative `booking_count` (confirmed rentals; never decremented).
+
+### `GET /api/v1/admin/rental-pitches`
+**Auth**: admin or manager — lists **all** rentable pitches (including inactive).
+Query params: `sport_id`, `city`, `search`.
+
+### `GET /api/v1/admin/rental-pitches/:id`
+**Auth**: admin or manager — a single rentable pitch with `services`, `availabilities`, and
+`cancellation_policy` (+ `refund_tiers`).
+
+### `POST /api/v1/admin/rental-pitches`
+**Auth**: admin or manager
+
+**Request**:
+```json
+{
+  "name_ar": "ملعب فاموس",
+  "name_en": "Vamos Arena",
+  "sport_id": "uuid",
+  "image_url": "rental/2026/06/abc.jpg",
+  "city": "Amman",
+  "address": "Na'our, Amman",
+  "google_maps_url": "https://maps.google.com/...",
+  "surface_type": "grass",
+  "price_per_hour": 30.0,
+  "slot_minutes": 30,
+  "min_duration_minutes": 60,
+  "max_duration_minutes": 120,
+  "is_active": true,
+  "cancellation_policy_id": "uuid-or-null",
+  "service_ids": ["uuid", "uuid"],
+  "availabilities": [
+    { "day_of_week": 1, "open_time": "16:30", "close_time": "23:00" },
+    { "day_of_week": 5, "open_time": "10:00", "close_time": "23:00" }
+  ]
+}
+```
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `name_ar`, `name_en`, `sport_id` | ✅ | Names are unique |
+| `price_per_hour` | ❌ | Booking price = `price_per_hour × minutes / 60` |
+| `slot_minutes` | ❌ | Default `30` |
+| `min_duration_minutes` / `max_duration_minutes` | ❌ | Defaults `60` / `120`; snapped to whole slots, `max ≥ min` |
+| `is_active` | ❌ | Default `true`. Inactive pitches are hidden from players and can't be booked |
+| `cancellation_policy_id` | ❌ | Falls back to the default policy when null |
+| `service_ids` | ❌ | Facilities (the existing services) attached to the pitch |
+| `availabilities` | ❌ | Per-weekday windows; `day_of_week` `0=Sun…6=Sat`, times `HH:MM`. A missing weekday is closed |
+
+**Response** `201`: the created pitch.
+
+### `PUT /api/v1/admin/rental-pitches/:id`
+**Auth**: admin or manager — same body as create. Include `availabilities` to **replace**
+the whole schedule, and `service_ids` to **replace** the services. Omit either key to leave
+it unchanged.
+
+### `DELETE /api/v1/admin/rental-pitches/:id`
+**Auth**: admin or manager.
+
+### `PUT /api/v1/admin/rental-pitches/:id/services`
+**Auth**: admin or manager — replace the pitch's services.
+```json
+{ "service_ids": ["uuid", "uuid"] }
+```
+
+### `POST /api/v1/admin/rental-pitches/:id/block`
+**Auth**: admin or manager
+
+Close a time block on a pitch (e.g. it was booked **off-platform**). The block occupies
+the slot exactly like a booking, so players can't double-book it.
+
+**Request**:
+```json
+{ "date": "2026-07-01", "start_time": "20:00", "duration_minutes": 120, "note": "Booked via WhatsApp" }
+```
+
+**Response** `201`: a rental booking with `is_external: true`, `status: "confirmed"`,
+`player_id: null`. The same opening-hours / overlap validation as player bookings applies.
+
+**Errors**: `409 the requested time overlaps an existing booking`, `400` for closed-day /
+out-of-hours / invalid duration, `404 rental pitch not found`.
+
+### `GET /api/v1/admin/rental-bookings`
+**Auth**: admin or manager — paginated list of rental bookings (player bookings and blocks),
+each embedding `rental_pitch` and `player`.
+
+**Query params**: `rental_pitch_id`, `player_id`, `status` (`pending_payment`, `confirmed`,
+`cancelled`), `date_from`, `date_to` (`YYYY-MM-DD`).
+
+### `POST /api/v1/admin/rental-bookings/:id/cancel`
+**Auth**: admin or manager
+
+Cancel a rental booking or remove a block. Optional body `{ "reason": "..." }`. A
+**confirmed, paid** player booking is **refunded in full** to the player's wallet and the
+player is notified; a block is simply removed, freeing the slot.
+
+**Response** `200`: the cancelled booking.
+
+---
+
 ## Error Codes Reference (Admin)
 
 | HTTP Status | Error Key | Description |
@@ -1638,4 +1749,10 @@ GET /api/v1/admin/audit-logs?actor_id=system&from=2026-06-17
 | `400` | `amount must be greater than zero` | Invalid receipt approval amount |
 | `404` | `payment receipt not found` | Invalid receipt ID |
 | `409` | `payment receipt has already been reviewed` | Receipt not in `pending` status |
+| `404` | `rental pitch not found` | Invalid rental pitch ID |
+| `404` | `rental booking not found` | Invalid rental booking ID |
+| `409` | `the requested time overlaps an existing booking` | Rental slot already taken (booking or block) |
+| `400` | `the requested time is outside the pitch's opening hours` | Block/booking outside the opening window |
+| `400` | `the pitch is closed on the selected day` | No opening window that weekday |
+| `400` | `invalid booking duration for this pitch` | Duration below min / above max / not slot-aligned |
 | `500` | `internal server error` | Unexpected server error |

@@ -563,3 +563,87 @@ export interface HighlightPayload {
   show_from?: string
   show_to?: string
 }
+
+// ─── Pitch Rental ─────────────────────────────────────────────────────────────
+
+// day_of_week: 0 = Sunday … 6 = Saturday; times are "HH:MM"
+export interface RentalPitchAvailability {
+  id?: string
+  rental_pitch_id?: string
+  day_of_week: number
+  open_time: string
+  close_time: string
+}
+
+export interface RentalPitch {
+  id: string
+  name_ar: string
+  name_en: string
+  sport_id: string
+  image_url: string
+  city: string
+  address: string
+  google_maps_url: string
+  surface_type: string
+  price_per_hour: number
+  slot_minutes: number
+  min_duration_minutes: number
+  max_duration_minutes: number
+  is_active: boolean
+  cancellation_policy_id?: string | null
+  rating?: number
+  booking_count?: number
+  sport?: Sport
+  services?: Service[]
+  availabilities?: RentalPitchAvailability[]
+  cancellation_policy?: CancellationPolicy
+}
+
+export interface RentalPitchPayload {
+  name_ar: string
+  name_en: string
+  sport_id: string
+  image_url: string
+  city: string
+  address: string
+  google_maps_url: string
+  surface_type: string
+  price_per_hour: number
+  slot_minutes: number
+  min_duration_minutes: number
+  max_duration_minutes: number
+  is_active: boolean
+  cancellation_policy_id?: string | null
+  service_ids?: string[]
+  availabilities?: RentalPitchAvailability[]
+}
+
+export type RentalBookingStatus = 'pending_payment' | 'confirmed' | 'cancelled'
+
+export interface RentalBooking {
+  id: string
+  rental_pitch_id: string
+  player_id?: string | null
+  status: RentalBookingStatus
+  is_external: boolean
+  date: string
+  start_time: string
+  end_time?: string
+  duration_minutes: number
+  price?: number
+  note?: string
+  created_at: string
+  rental_pitch?: RentalPitch
+  player?: { id: string; first_name: string; last_name: string; email?: string; phone?: string }
+}
+
+export interface BlockSlotPayload {
+  date: string
+  start_time: string
+  duration_minutes: number
+  note?: string
+}
+
+export interface CancelRentalBookingPayload {
+  reason?: string
+}
