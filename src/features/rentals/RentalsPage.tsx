@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, Search, RefreshCw, Star, CalendarClock, Ban, XCircle } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, RefreshCw, Star, CalendarClock, Ban, XCircle, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -47,6 +47,11 @@ const rentalPitchSchema = z.object({
   address: z.string().min(1, 'Address is required'),
   google_maps_url: z.string().url('Must be a valid URL'),
   surface_type: z.string().min(1, 'Surface type is required'),
+  phone_number: z.string().optional(),
+  max_players: z.preprocess(
+    v => (v === '' || v == null ? undefined : v),
+    z.coerce.number().int().positive('Must be greater than 0').optional(),
+  ),
   price_per_hour: z.coerce.number().min(0, 'Must be 0 or more'),
   slot_minutes: z.coerce.number().int().positive('Must be greater than 0'),
   min_duration_minutes: z.coerce.number().int().positive('Must be greater than 0'),
@@ -66,7 +71,8 @@ const DEFAULT_SCHEDULE: DaySchedule[] = WEEKDAYS.map(() => ({ enabled: false, op
 
 const DEFAULT_PITCH_VALUES: RentalPitchFormValues = {
   name_en: '', name_ar: '', sport_id: '', image_url: '', city: '', address: '',
-  google_maps_url: '', surface_type: '', price_per_hour: 30, slot_minutes: 30,
+  google_maps_url: '', surface_type: '', phone_number: '', max_players: undefined,
+  price_per_hour: 30, slot_minutes: 30,
   min_duration_minutes: 60, max_duration_minutes: 120, is_active: true, cancellation_policy_id: '',
 }
 
@@ -130,6 +136,8 @@ function RentalPitchesTab() {
       .map(d => ({ day_of_week: d.day, open_time: d.open_time, close_time: d.close_time }))
     return {
       ...values,
+      phone_number: values.phone_number?.trim() || undefined,
+      max_players: values.max_players ?? undefined,
       cancellation_policy_id: values.cancellation_policy_id || null,
       service_ids: selectedServiceIds,
       availabilities,
@@ -175,6 +183,7 @@ function RentalPitchesTab() {
     form.reset({
       name_en: p.name_en, name_ar: p.name_ar, sport_id: p.sport_id, image_url: p.image_url,
       city: p.city, address: p.address, google_maps_url: p.google_maps_url, surface_type: p.surface_type,
+      phone_number: p.phone_number ?? '', max_players: p.max_players,
       price_per_hour: p.price_per_hour, slot_minutes: p.slot_minutes,
       min_duration_minutes: p.min_duration_minutes, max_duration_minutes: p.max_duration_minutes,
       is_active: p.is_active, cancellation_policy_id: p.cancellation_policy_id ?? '',
@@ -213,14 +222,22 @@ function RentalPitchesTab() {
         <div>
           <div className="font-medium">{row.name_en}</div>
           <div className="text-xs text-muted-foreground">{row.city}</div>
+          {row.phone_number && (
+            <a href={`tel:${row.phone_number}`} className="text-xs text-primary hover:underline" dir="ltr">{row.phone_number}</a>
+          )}
         </div>
       ),
     },
     { key: 'price', header: 'Price / Hour', cell: row => <span className="font-semibold text-sm">{formatCurrency(row.price_per_hour)}</span> },
     {
       key: 'duration',
-      header: 'Duration',
-      cell: row => <span className="text-xs text-muted-foreground">{row.min_duration_minutes}–{row.max_duration_minutes} min · {row.slot_minutes}m slots</span>,
+      header: 'Duration / Capacity',
+      cell: row => (
+        <div className="text-xs text-muted-foreground">
+          <div>{row.min_duration_minutes}–{row.max_duration_minutes} min · {row.slot_minutes}m slots</div>
+          {row.max_players ? <div className="inline-flex items-center gap-1 mt-0.5"><Users className="w-3 h-3" />{row.max_players} players</div> : null}
+        </div>
+      ),
     },
     { key: 'rating', header: 'Rating', cell: row => <RatingStars rating={row.rating} /> },
     { key: 'bookings', header: 'Bookings', cell: row => <span className="text-sm">{row.booking_count ?? 0}</span> },
@@ -309,6 +326,32 @@ function RentalPitchesTab() {
                   <FormMessage />
                 </FormItem>
               )} />
+
+              <div className="grid grid-cols-2 gap-3">
+                <FormField control={form.control} name="phone_number" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contact Phone</FormLabel>
+                    <FormControl><Input type="tel" dir="ltr" placeholder="+962790000000" {...field} value={field.value ?? ''} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="max_players" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Max Players (capacity)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="1"
+                        step="1"
+                        placeholder="e.g. 14"
+                        value={field.value ?? ''}
+                        onChange={e => field.onChange(e.target.value === '' ? undefined : e.target.value)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
 
               {/* Pricing & slotting */}
               <div className="grid grid-cols-2 gap-3">

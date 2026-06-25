@@ -6,7 +6,7 @@
 > **Last Updated**: 2026-06-25
 
 ### What's New in 3.10.0
-- **Pitch rental (new section)**: manage rentable pitches independent of match pitches — set per-weekday opening hours, slotting rules (30-min slots; 1h/1.5h/2h bookings), price-per-hour, services and a cancellation policy (`POST/PUT/DELETE /admin/rental-pitches`). **Block a slot** when a pitch is booked off-platform (`POST /admin/rental-pitches/:id/block`), browse all rental bookings (`GET /admin/rental-bookings`), and cancel/refund or unblock (`POST /admin/rental-bookings/:id/cancel`). Each pitch tracks an aggregated rating (1–5, only from players who rented it) and a cumulative `booking_count`.
+- **Pitch rental (new section)**: manage rentable pitches independent of match pitches — set per-weekday opening hours, slotting rules (30-min slots; 1h/1.5h/2h bookings), price-per-hour, `phone_number`, `max_players` (capacity), services and a cancellation policy (`POST/PUT/DELETE /admin/rental-pitches`). The pitch list is filterable by `day_of_week`. **Block a slot** when a pitch is booked off-platform (`POST /admin/rental-pitches/:id/block`), browse all rental bookings (`GET /admin/rental-bookings`), and cancel/refund or unblock (`POST /admin/rental-bookings/:id/cancel`). Each pitch tracks an aggregated rating (1–5, only from players who rented it) and a cumulative `booking_count`.
 
 ### What's New in 3.9.0
 - **Reserve now, pay later** approval workflow: players can reserve a seat instantly (status `pending_approval`) and pay off-platform. New endpoints to **approve** (`POST /admin/bookings/:id/approve`) or **reject/remove** (`POST /admin/bookings/:id/reject`) reservations, plus an admin-defined registration message (`PUT /admin/settings/registration-instructions`). Players are notified at each step (reserved, approved, removed).
@@ -1636,7 +1636,8 @@ who rented it) plus a cumulative `booking_count` (confirmed rentals; never decre
 
 ### `GET /api/v1/admin/rental-pitches`
 **Auth**: admin or manager — lists **all** rentable pitches (including inactive).
-Query params: `sport_id`, `city`, `search`.
+Query params: `sport_id`, `city`, `search`, `day_of_week` (`0=Sunday…6=Saturday`, keeps only
+pitches open that weekday).
 
 ### `GET /api/v1/admin/rental-pitches/:id`
 **Auth**: admin or manager — a single rentable pitch with `services`, `availabilities`, and
@@ -1656,6 +1657,8 @@ Query params: `sport_id`, `city`, `search`.
   "address": "Na'our, Amman",
   "google_maps_url": "https://maps.google.com/...",
   "surface_type": "grass",
+  "phone_number": "+962790000000",
+  "max_players": 14,
   "price_per_hour": 30.0,
   "slot_minutes": 30,
   "min_duration_minutes": 60,
@@ -1673,6 +1676,8 @@ Query params: `sport_id`, `city`, `search`.
 | Field | Required | Notes |
 |-------|----------|-------|
 | `name_ar`, `name_en`, `sport_id` | ✅ | Names are unique |
+| `phone_number` | ❌ | Pitch contact phone shown to players |
+| `max_players` | ❌ | Maximum players the pitch can host (capacity) |
 | `price_per_hour` | ❌ | Booking price = `price_per_hour × minutes / 60` |
 | `slot_minutes` | ❌ | Default `30` |
 | `min_duration_minutes` / `max_duration_minutes` | ❌ | Defaults `60` / `120`; snapped to whole slots, `max ≥ min` |

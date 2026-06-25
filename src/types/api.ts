@@ -585,6 +585,8 @@ export interface RentalPitch {
   address: string
   google_maps_url: string
   surface_type: string
+  phone_number?: string
+  max_players?: number
   price_per_hour: number
   slot_minutes: number
   min_duration_minutes: number
@@ -608,6 +610,8 @@ export interface RentalPitchPayload {
   address: string
   google_maps_url: string
   surface_type: string
+  phone_number?: string
+  max_players?: number
   price_per_hour: number
   slot_minutes: number
   min_duration_minutes: number
