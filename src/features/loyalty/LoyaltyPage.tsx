@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, AlertCircle, TrendingUp, TrendingDown } from 'lucide-react'
+import { Plus, Pencil, Trash2, AlertCircle, TrendingUp, TrendingDown, Crown } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -486,6 +486,7 @@ const pointRuleSchema = z.object({
   name_en: z.string().min(1, 'English name is required'),
   name_ar: z.string().min(1, 'Arabic name is required'),
   points: z.coerce.number().int().refine(v => v !== 0, { message: 'Points cannot be zero' }),
+  subscriber_points: z.coerce.number().int(),
   is_enabled: z.boolean(),
 })
 
@@ -504,7 +505,7 @@ function PointRulesTab() {
 
   const form = useForm<PointRuleFormValues>({
     resolver: zodResolver(pointRuleSchema),
-    defaultValues: { name_en: '', name_ar: '', points: 0, is_enabled: true },
+    defaultValues: { name_en: '', name_ar: '', points: 0, subscriber_points: 0, is_enabled: true },
   })
 
   const updateMutation = useMutation({
@@ -538,6 +539,7 @@ function PointRulesTab() {
       name_en: rule.name_en,
       name_ar: rule.name_ar,
       points: rule.points,
+      subscriber_points: rule.subscriber_points ?? 0,
       is_enabled: rule.is_enabled,
     })
     setSheetOpen(true)
@@ -582,6 +584,23 @@ function PointRulesTab() {
       },
     },
     {
+      key: 'subscriber_points',
+      header: 'Subscriber Points',
+      cell: row => {
+        // 0 means "not configured" — the engine falls back to the normal points.
+        if (!row.subscriber_points) {
+          return <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Crown className="w-3.5 h-3.5" />= normal ({row.points > 0 ? `+${row.points}` : row.points})</span>
+        }
+        const isPositive = row.subscriber_points > 0
+        return (
+          <div className="inline-flex items-center gap-1 font-semibold text-sm text-amber-600">
+            <Crown className="w-3.5 h-3.5" />
+            {isPositive ? `+${row.subscriber_points}` : row.subscriber_points}
+          </div>
+        )
+      },
+    },
+    {
       key: 'is_enabled',
       header: 'Enabled',
       cell: row => (
@@ -608,8 +627,9 @@ function PointRulesTab() {
   return (
     <div>
       <p className="text-sm text-muted-foreground mb-4">
-        Configure how many points players earn or lose for each action. Disabled rules contribute 0 points.
-        Changes apply to future bookings only.
+        Configure how many points players earn or lose for each action. Active subscribers earn the
+        <span className="inline-flex items-center gap-1 mx-1 align-middle text-amber-600"><Crown className="w-3.5 h-3.5" />subscriber points</span>
+        instead (0 = same as normal). Disabled rules contribute 0 points. Changes apply to future bookings only.
       </p>
       <DataTable columns={columns} data={rules} isLoading={isLoading} emptyMessage="No point rules found." />
 
@@ -642,6 +662,16 @@ function PointRulesTab() {
                     />
                   </FormControl>
                   <p className="text-xs text-muted-foreground">Use a negative value to deduct points (e.g. -10 for a red card).</p>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="subscriber_points" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-1.5"><Crown className="w-3.5 h-3.5 text-amber-600" />Subscriber Points</FormLabel>
+                  <FormControl>
+                    <Input type="number" {...field} placeholder="0 = same as normal points" />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">Awarded to active subscribers for this action. Set to <strong>0</strong> to fall back to the normal points above.</p>
                   <FormMessage />
                 </FormItem>
               )} />

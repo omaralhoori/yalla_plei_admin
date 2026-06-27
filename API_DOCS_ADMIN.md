@@ -6,7 +6,7 @@
 > **Last Updated**: 2026-06-27
 
 ### What's New in 3.12.0
-- **Subscriptions (new section)**: manage the player subscription module. Create/edit/delete **monthly & annual plans** with pricing and store product ids (`/admin/subscription-plans`), tune the shared **benefits** — early-join minutes, loyalty points multiplier, and profile theme (`/admin/subscription-config`), and **manage members**: list/filter subscriptions, inspect one, and cancel on a player's behalf (`/admin/subscriptions`). Website billing runs on HyperPay (tokenized recurring charges); mobile runs on the App Store / Google Play. See **Subscriptions Management (Admin)**.
+- **Subscriptions (new section)**: manage the player subscription module. Create/edit/delete **monthly & annual plans** with pricing and store product ids (`/admin/subscription-plans`), tune the shared **benefits** — early-join minutes and profile theme (`/admin/subscription-config`), and **manage members**: list/filter subscriptions, inspect one, and cancel on a player's behalf (`/admin/subscriptions`). Boosted loyalty points are configured **per point rule** via `subscriber_points` (see **Points System**). Website billing runs on HyperPay (tokenized recurring charges); mobile runs on the App Store / Google Play. See **Subscriptions Management (Admin)**.
 
 ### What's New in 3.11.0
 - **Online payment (HyperPay)**: cards & Apple Pay online payments via the HyperPay COPYandPAY widget. There are **no new admin endpoints** — it's configured entirely through **environment variables** (access token, channel entity ids, currency, etc.). See **Online Payment Configuration (HyperPay)**. Successful online payments appear in **Financial Transactions** with `source` = `card` / `apple_pay`.
@@ -105,7 +105,7 @@ Obtain a Custom JWT the same way players do:
 | **RewardRedemption** | Belongs to User+Reward |
 | **AuditLog** | Append-only mutation history: `table_name`, `record_id`, `action` (`create`/`update`/`delete`), `actor_id`, `created_at` |
 | **SubscriptionPlan** | Purchasable plan. Fields: `code` (unique), `interval` (`monthly`/`annual`), `price`, `currency`, `apple_product_id`, `google_product_id`, `is_active`, `sort_order` |
-| **SubscriptionConfig** | Single-row shared benefit config: `early_join_minutes`, `points_multiplier`, `theme` |
+| **SubscriptionConfig** | Single-row shared benefit config: `early_join_minutes`, `theme` (boosted points live on `PointRule.subscriber_points`) |
 | **PlayerSubscription** | Belongs to User (one current row per user) + Plan. Fields: `provider` (`hyperpay`/`apple`/`google`), `status`, `current_period_start/end`, `auto_renew` |
 
 ### Audit Fields (all mutable tables)
@@ -921,14 +921,14 @@ Returns all scoring rules (the defaults are seeded automatically on startup).
 {
   "success": true,
   "data": [
-    { "key": "booking_paid",      "name_ar": "حجز مباراة والدفع",  "name_en": "Booking confirmed & paid", "points": 5,   "is_enabled": true, "updated_at": "..." },
-    { "key": "attendance",        "name_ar": "حضور المباراة",       "name_en": "Match attendance",         "points": 5,   "is_enabled": true, "updated_at": "..." },
-    { "key": "goal",              "name_ar": "تسجيل هدف",           "name_en": "Goal scored",              "points": 10,  "is_enabled": true, "updated_at": "..." },
-    { "key": "assist",            "name_ar": "صناعة هدف",           "name_en": "Assist",                   "points": 5,   "is_enabled": true, "updated_at": "..." },
-    { "key": "mvp",               "name_ar": "رجل المباراة",        "name_en": "Man of the match",         "points": 20,  "is_enabled": true, "updated_at": "..." },
-    { "key": "rating_multiplier", "name_ar": "نقاط لكل درجة تقييم", "name_en": "Points per rating point",  "points": 1,   "is_enabled": true, "updated_at": "..." },
-    { "key": "yellow_card",       "name_ar": "بطاقة صفراء",         "name_en": "Yellow card",              "points": -5,  "is_enabled": true, "updated_at": "..." },
-    { "key": "red_card",          "name_ar": "بطاقة حمراء",         "name_en": "Red card",                 "points": -10, "is_enabled": true, "updated_at": "..." }
+    { "key": "booking_paid",      "name_ar": "حجز مباراة والدفع",  "name_en": "Booking confirmed & paid", "points": 5,   "subscriber_points": 8,  "is_enabled": true, "updated_at": "..." },
+    { "key": "attendance",        "name_ar": "حضور المباراة",       "name_en": "Match attendance",         "points": 5,   "subscriber_points": 8,  "is_enabled": true, "updated_at": "..." },
+    { "key": "goal",              "name_ar": "تسجيل هدف",           "name_en": "Goal scored",              "points": 10,  "subscriber_points": 15, "is_enabled": true, "updated_at": "..." },
+    { "key": "assist",            "name_ar": "صناعة هدف",           "name_en": "Assist",                   "points": 5,   "subscriber_points": 8,  "is_enabled": true, "updated_at": "..." },
+    { "key": "mvp",               "name_ar": "رجل المباراة",        "name_en": "Man of the match",         "points": 20,  "subscriber_points": 30, "is_enabled": true, "updated_at": "..." },
+    { "key": "rating_multiplier", "name_ar": "نقاط لكل درجة تقييم", "name_en": "Points per rating point",  "points": 1,   "subscriber_points": 2,  "is_enabled": true, "updated_at": "..." },
+    { "key": "yellow_card",       "name_ar": "بطاقة صفراء",         "name_en": "Yellow card",              "points": -5,  "subscriber_points": -5, "is_enabled": true, "updated_at": "..." },
+    { "key": "red_card",          "name_ar": "بطاقة حمراء",         "name_en": "Red card",                 "points": -10, "subscriber_points": -10,"is_enabled": true, "updated_at": "..." }
   ]
 }
 ```
@@ -942,6 +942,14 @@ Returns all scoring rules (the defaults are seeded automatically on startup).
 | `rating_multiplier` | Per 1.0 of the referee's rating (e.g. value `2` × rating `7.5` → 15 points, rounded) |
 | `yellow_card` / `red_card` | Per card — use **negative** values to deduct points |
 
+**Subscriber points.** Each rule carries two values: `points` for normal players and
+`subscriber_points` for **active subscribers**. When a subscriber's booking is scored,
+the engine uses `subscriber_points` for every rule (e.g. attendance `5` → `8`). If a
+rule's `subscriber_points` is left at `0`, the engine falls back to `points`, so
+subscribers never earn less than a normal player by default. This is how the
+subscription "boosted loyalty points" benefit is configured — there is no global
+multiplier.
+
 ---
 
 ### `PUT /api/v1/admin/point-rules/:key`
@@ -952,8 +960,10 @@ the update; already-awarded points are not retroactively recalculated.
 
 **Request Body**:
 ```json
-{ "points": 15, "is_enabled": true, "name_ar": "تسجيل هدف", "name_en": "Goal scored" }
+{ "points": 10, "subscriber_points": 15, "is_enabled": true, "name_ar": "تسجيل هدف", "name_en": "Goal scored" }
 ```
+- `points`: value for normal players.
+- `subscriber_points`: value for active subscribers (`0` = fall back to `points`).
 
 **Response** `200`: the updated rule.
 
@@ -1812,11 +1822,11 @@ subscriptions).
 
 ### The benefits
 
-| Benefit | Config field | Effect |
-|---------|--------------|--------|
-| Early match access | `early_join_minutes` | Subscribers may register for a match this many minutes **before** the public registration window opens. |
-| Boosted loyalty points | `points_multiplier` | A subscriber's per-booking points are multiplied by this factor (applied by the points engine). |
-| Premium profile theme | `theme` | Theme key surfaced on the player profile (`is_subscribed` + `subscription_theme`) so other players see their premium profile. |
+| Benefit | Where it's configured | Effect |
+|---------|-----------------------|--------|
+| Early match access | `subscription-config.early_join_minutes` | Subscribers may register for a match this many minutes **before** the public registration window opens. |
+| Boosted loyalty points | **Point rules** `subscriber_points` (see **Points System**) | Each scoring action awards more points to subscribers (e.g. attendance `5` → `8`). Configured per rule via `PUT /admin/point-rules/:key` — there is no global multiplier. |
+| Premium profile theme | `subscription-config.theme` | Theme key surfaced on the player profile (`is_subscribed` + `subscription_theme`) so other players see their premium profile. |
 
 ---
 
@@ -1876,7 +1886,6 @@ Returns the single shared benefit configuration (created with defaults on first 
   "data": {
     "id": "uuid",
     "early_join_minutes": 15,
-    "points_multiplier": 2,
     "theme": "premium"
   }
 }
@@ -1889,13 +1898,14 @@ Updates the benefit configuration. All fields optional.
 ```json
 {
   "early_join_minutes": 20,
-  "points_multiplier": 3,
   "theme": "gold"
 }
 ```
 - `early_join_minutes`: how many minutes before public registration subscribers may join.
-- `points_multiplier`: loyalty-points multiplier for subscribers (e.g. `2` = double points).
 - `theme`: profile theme key the app renders for subscribers.
+
+> **Boosted loyalty points** are **not** set here — configure them per scoring action via
+> `subscriber_points` on the point rules (`PUT /admin/point-rules/:key`, see **Points System**).
 
 **Response** `200`: the updated configuration. Changes apply immediately to all active subscribers.
 

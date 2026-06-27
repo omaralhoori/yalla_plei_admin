@@ -509,12 +509,14 @@ export interface PointRule {
   name_ar: string
   name_en: string
   points: number
+  subscriber_points: number
   is_enabled: boolean
   updated_at?: string
 }
 
 export interface PointRulePayload {
   points?: number
+  subscriber_points?: number
   is_enabled?: boolean
   name_ar?: string
   name_en?: string
@@ -688,13 +690,11 @@ export interface SubscriptionPlanPayload {
 export interface SubscriptionConfig {
   id?: string
   early_join_minutes: number
-  points_multiplier: number
   theme: string
 }
 
 export interface SubscriptionConfigPayload {
   early_join_minutes?: number
-  points_multiplier?: number
   theme?: string
 }
 

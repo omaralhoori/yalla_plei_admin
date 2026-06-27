@@ -235,7 +235,6 @@ function PlansTab() {
 
 const configSchema = z.object({
   early_join_minutes: z.coerce.number().int('Whole number').min(0, 'Must be 0 or more'),
-  points_multiplier: z.coerce.number().min(1, 'Must be at least 1'),
   theme: z.string().min(1, 'Theme is required'),
 })
 type ConfigFormValues = z.infer<typeof configSchema>
@@ -252,9 +251,9 @@ function BenefitsTab() {
   const form = useForm<ConfigFormValues>({
     resolver: zodResolver(configSchema),
     values: config
-      ? { early_join_minutes: config.early_join_minutes, points_multiplier: config.points_multiplier, theme: config.theme }
+      ? { early_join_minutes: config.early_join_minutes, theme: config.theme }
       : undefined,
-    defaultValues: { early_join_minutes: 15, points_multiplier: 2, theme: 'premium' },
+    defaultValues: { early_join_minutes: 15, theme: 'premium' },
   })
 
   const updateMutation = useMutation({
@@ -286,7 +285,6 @@ function BenefitsTab() {
           <div className="space-y-4">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
           </div>
         ) : (
           <Form {...form}>
@@ -299,14 +297,14 @@ function BenefitsTab() {
                   <FormMessage />
                 </FormItem>
               )} />
-              <FormField control={form.control} name="points_multiplier" render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center gap-2"><Sparkles className="w-4 h-4" />Loyalty Points Multiplier</FormLabel>
-                  <FormControl><Input type="number" min="1" step="0.1" className="max-w-[180px]" {...field} /></FormControl>
-                  <p className="text-xs text-muted-foreground">Per-booking loyalty points are multiplied by this factor (e.g. 2 = double points).</p>
-                  <FormMessage />
-                </FormItem>
-              )} />
+              <div className="rounded-lg border bg-muted/40 p-3 flex items-start gap-2">
+                <Sparkles className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                <p className="text-xs text-muted-foreground">
+                  Boosted loyalty points for subscribers are now configured <strong>per action</strong> via the
+                  {' '}<Link to="/loyalty" className="text-primary hover:underline">Loyalty → Point Rules</Link>{' '}
+                  <strong>Subscriber Points</strong> field — there is no longer a global multiplier.
+                </p>
+              </div>
               <FormField control={form.control} name="theme" render={({ field }) => (
                 <FormItem>
                   <FormLabel className="flex items-center gap-2"><Palette className="w-4 h-4" />Premium Profile Theme</FormLabel>
