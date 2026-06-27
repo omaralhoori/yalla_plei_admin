@@ -1,9 +1,12 @@
 # Yalla Plei — Admin API Documentation
 
 > **Base URL**: `https://api.yallaplei.com/api/v1`  
-> **Version**: 3.12.0  
+> **Version**: 3.13.0  
 > **Audience**: Admin panel / back-office (role = `admin` or `manager`)  
 > **Last Updated**: 2026-06-27
+
+### What's New in 3.13.0
+- **Pitch managers (new role)**: a new user role `pitch_manager`. Create the account with `POST /admin/users` (`"role": "pitch_manager"`) and assign one or more rentable pitches to it with the new `manager_id` field on `POST/PUT /admin/rental-pitches`. A pitch manager has its own API (see **`API_DOCS_PITCH_MANAGER.md`**) where it sees only its pitches, views their bookings (booker **name + phone** only), blocks/unblocks off-platform slots, and is notified of new bookings. A **grace window** (`DefaultRentalHoldMinutes`, 15 min) prevents a manager from blocking a slot a player is mid-booking; abandoned unpaid holds are auto-released after the window.
 
 ### What's New in 3.12.0
 - **Subscriptions (new section)**: manage the player subscription module. Create/edit/delete **monthly & annual plans** with pricing and store product ids (`/admin/subscription-plans`), tune the shared **benefits** — early-join minutes and profile theme (`/admin/subscription-config`), and **manage members**: list/filter subscriptions, inspect one, and cancel on a player's behalf (`/admin/subscriptions`). Boosted loyalty points are configured **per point rule** via `subscriber_points` (see **Points System**). Website billing runs on HyperPay (tokenized recurring charges); mobile runs on the App Store / Google Play. See **Subscriptions Management (Admin)**.
@@ -833,7 +836,7 @@ Replaces the full set of feature services linked to this template. Pass an empty
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `search` | string | Search name, email, or phone |
-| `role` | string | `"player"`, `"referee"`, `"admin"`, `"manager"` |
+| `role` | string | `"player"`, `"referee"`, `"pitch_manager"`, `"admin"`, `"manager"` |
 | `limit` | int | Default 20 |
 | `offset` | int | Default 0 |
 
@@ -843,7 +846,7 @@ Replaces the full set of feature services linked to this template. Pass an empty
 
 ### `POST /api/v1/admin/users`
 **Auth**: admin or manager  
-Creates an admin, manager, or referee account.
+Creates an admin, manager, referee, or pitch-manager account.
 
 **Request Body**:
 ```json
@@ -860,9 +863,10 @@ Creates an admin, manager, or referee account.
 
 | Field | Values |
 |-------|--------|
-| `role` | `"admin"`, `"manager"`, `"referee"` |
+| `role` | `"admin"`, `"manager"`, `"referee"`, `"pitch_manager"` |
 
-**Response** `201`: created user.
+**Response** `201`: created user. For `pitch_manager`, then assign pitches via `manager_id`
+on `PUT /admin/rental-pitches/:id` — see **Pitch Managers**.
 
 ---
 
@@ -1683,6 +1687,7 @@ pitches open that weekday).
   "min_duration_minutes": 60,
   "max_duration_minutes": 120,
   "is_active": true,
+  "manager_id": "uuid-or-null",
   "cancellation_policy_id": "uuid-or-null",
   "service_ids": ["uuid", "uuid"],
   "availabilities": [
@@ -1701,6 +1706,7 @@ pitches open that weekday).
 | `slot_minutes` | ❌ | Default `30` |
 | `min_duration_minutes` / `max_duration_minutes` | ❌ | Defaults `60` / `120`; snapped to whole slots, `max ≥ min` |
 | `is_active` | ❌ | Default `true`. Inactive pitches are hidden from players and can't be booked |
+| `manager_id` | ❌ | User id (role `pitch_manager`) who manages this pitch. `null` = unmanaged. See **Pitch Managers** |
 | `cancellation_policy_id` | ❌ | Falls back to the default policy when null |
 | `service_ids` | ❌ | Facilities (the existing services) attached to the pitch |
 | `availabilities` | ❌ | Per-weekday windows; `day_of_week` `0=Sun…6=Sat`, times `HH:MM`. A missing weekday is closed |
@@ -1710,7 +1716,8 @@ pitches open that weekday).
 ### `PUT /api/v1/admin/rental-pitches/:id`
 **Auth**: admin or manager — same body as create. Include `availabilities` to **replace**
 the whole schedule, and `service_ids` to **replace** the services. Omit either key to leave
-it unchanged.
+it unchanged. `manager_id` is overwritten by the value sent — send the id to assign a pitch
+manager, or `null` to unassign.
 
 ### `DELETE /api/v1/admin/rental-pitches/:id`
 **Auth**: admin or manager.
@@ -1735,8 +1742,14 @@ the slot exactly like a booking, so players can't double-book it.
 **Response** `201`: a rental booking with `is_external: true`, `status: "confirmed"`,
 `player_id: null`. The same opening-hours / overlap validation as player bookings applies.
 
-**Errors**: `409 the requested time overlaps an existing booking`, `400` for closed-day /
-out-of-hours / invalid duration, `404 rental pitch not found`.
+> **Grace window**: a player's unpaid (`pending_payment`) booking holds its slot for
+> `DefaultRentalHoldMinutes` (15 min). Blocking a slot that a player is mid-booking is
+> rejected with `409 a player is currently booking this slot; please try again shortly`.
+> Once the window lapses the unpaid hold is auto-released and the slot can be blocked/booked.
+
+**Errors**: `409 the requested time overlaps an existing booking`,
+`409 a player is currently booking this slot...`, `400` for closed-day / out-of-hours /
+invalid duration, `404 rental pitch not found`.
 
 ### `GET /api/v1/admin/rental-bookings`
 **Auth**: admin or manager — paginated list of rental bookings (player bookings and blocks),
@@ -1753,6 +1766,47 @@ Cancel a rental booking or remove a block. Optional body `{ "reason": "..." }`. 
 player is notified; a block is simply removed, freeing the slot.
 
 **Response** `200`: the cancelled booking.
+
+---
+
+## Pitch Managers
+
+A **pitch manager** is a delegated account that operates a specific set of rentable pitches
+on the owner's behalf, without admin access. They get a **dedicated API** documented in
+**`API_DOCS_PITCH_MANAGER.md`**.
+
+### What a pitch manager can do
+- See **only the pitches assigned to them** and each pitch's availability.
+- View the **bookings** on their pitches — limited to the booker's **name and phone number**
+  (no wallet, email or other PII).
+- **Block / unblock** slots for off-platform bookings on their pitches.
+- Receive a **push notification** whenever a new booking is confirmed on one of their pitches.
+
+They **cannot** manage pitches (create/edit/delete), see other pitches, cancel/refund player
+bookings, or touch any other part of the system.
+
+### Setting one up (admin)
+1. **Create the user** with the new role:
+   ```
+   POST /api/v1/admin/users
+   { "first_name": "Sami", "last_name": "Odeh", "phone": "+962790000000",
+     "email": "sami@example.com", "password": "•••••", "role": "pitch_manager" }
+   ```
+2. **Assign pitches** to them by setting `manager_id` on each rentable pitch
+   (`POST` on create or `PUT /admin/rental-pitches/:id`). One manager can own many pitches;
+   set `manager_id: null` to unassign.
+
+### Concurrency / grace window
+When a player starts a booking, the slot is held for `DefaultRentalHoldMinutes` (15 min,
+measured from when the unpaid booking was created). During that window the pitch manager
+**cannot** block the slot — the block call returns
+`409 a player is currently booking this slot; please try again shortly`. This prevents a
+manager from blocking a slot a player is actively paying for. If the player doesn't finish
+within the window, the hold is treated as abandoned and released automatically, freeing the
+slot for both other players and the manager.
+
+> The user-creation endpoint accepts `role: "pitch_manager"` exactly like `referee` — see
+> **Users** above.
 
 ---
 

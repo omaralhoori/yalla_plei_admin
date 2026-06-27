@@ -26,7 +26,7 @@ const createUserSchema = z.object({
   email: z.string().email('Valid email is required'),
   phone: z.string().min(7, 'Valid phone number is required'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
-  role: z.enum(['player', 'manager', 'admin', 'referee']),
+  role: z.enum(['player', 'manager', 'admin', 'referee', 'pitch_manager']),
   gender: z.enum(['male', 'female']),
 })
 
@@ -37,6 +37,16 @@ const ROLE_BADGE: Record<string, string> = {
   manager: 'bg-blue-100 text-blue-700',
   player: 'bg-slate-100 text-slate-600',
   referee: 'bg-green-100 text-green-700',
+  pitch_manager: 'bg-amber-100 text-amber-700',
+}
+
+// Display label for roles (pitch_manager → "Pitch Manager")
+const ROLE_LABEL: Record<string, string> = {
+  admin: 'Admin',
+  manager: 'Manager',
+  player: 'Player',
+  referee: 'Referee',
+  pitch_manager: 'Pitch Manager',
 }
 
 export default function UsersPage() {
@@ -106,8 +116,8 @@ export default function UsersPage() {
       key: 'role',
       header: 'Role',
       cell: row => (
-        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium capitalize ${ROLE_BADGE[row.role] ?? 'bg-slate-100 text-slate-600'}`}>
-          {row.role}
+        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${ROLE_BADGE[row.role] ?? 'bg-slate-100 text-slate-600'}`}>
+          {ROLE_LABEL[row.role] ?? row.role}
         </span>
       ),
     },
@@ -182,6 +192,7 @@ export default function UsersPage() {
               <SelectItem value="manager">Manager</SelectItem>
               <SelectItem value="admin">Admin</SelectItem>
               <SelectItem value="referee">Referee</SelectItem>
+              <SelectItem value="pitch_manager">Pitch Manager</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -208,7 +219,7 @@ export default function UsersPage() {
           <DialogHeader>
             <DialogTitle>Create Admin User</DialogTitle>
             <DialogDescription>
-              Manually create a manager or admin account, bypassing the standard registration flow.
+              Manually create a staff account (admin, manager, referee, or pitch manager), bypassing the standard registration flow.
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
@@ -241,6 +252,7 @@ export default function UsersPage() {
                         <SelectItem value="admin">Admin</SelectItem>
                         <SelectItem value="player">Player</SelectItem>
                         <SelectItem value="referee">Referee</SelectItem>
+                        <SelectItem value="pitch_manager">Pitch Manager</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />

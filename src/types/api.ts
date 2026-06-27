@@ -291,7 +291,7 @@ export interface AdminUser {
   phone: string
   emergency_phone?: string
   date_of_birth?: string
-  role: 'player' | 'admin' | 'manager' | 'referee'
+  role: 'player' | 'admin' | 'manager' | 'referee' | 'pitch_manager'
   gender: 'male' | 'female'
   auth_provider: string
   is_phone_verified: boolean
@@ -332,7 +332,7 @@ export interface CreateAdminUserPayload {
   email: string
   phone: string
   password: string
-  role: 'player' | 'manager' | 'admin' | 'referee'
+  role: 'player' | 'manager' | 'admin' | 'referee' | 'pitch_manager'
   gender: 'male' | 'female'
 }
 
@@ -594,6 +594,7 @@ export interface RentalPitch {
   min_duration_minutes: number
   max_duration_minutes: number
   is_active: boolean
+  manager_id?: string | null
   cancellation_policy_id?: string | null
   rating?: number
   booking_count?: number
@@ -601,6 +602,7 @@ export interface RentalPitch {
   services?: Service[]
   availabilities?: RentalPitchAvailability[]
   cancellation_policy?: CancellationPolicy
+  manager?: { id: string; first_name: string; last_name: string; email?: string; phone?: string }
 }
 
 export interface RentalPitchPayload {
@@ -619,6 +621,7 @@ export interface RentalPitchPayload {
   min_duration_minutes: number
   max_duration_minutes: number
   is_active: boolean
+  manager_id?: string | null
   cancellation_policy_id?: string | null
   service_ids?: string[]
   availabilities?: RentalPitchAvailability[]

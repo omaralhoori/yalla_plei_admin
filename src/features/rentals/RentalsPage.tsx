@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, Search, RefreshCw, Star, CalendarClock, Ban, XCircle, Users } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search, RefreshCw, Star, CalendarClock, Ban, XCircle, Users, UserCog } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -26,7 +26,7 @@ import { usePagination } from '@/hooks/usePagination'
 import { api } from '@/lib/api'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type {
-  ApiResponse, PaginatedResponse, Sport, Service, CancellationPolicy,
+  ApiResponse, PaginatedResponse, Sport, Service, CancellationPolicy, AdminUser,
   RentalPitch, RentalPitchPayload, RentalPitchAvailability,
   RentalBooking, BlockSlotPayload, CancelRentalBookingPayload,
 } from '@/types/api'
@@ -57,6 +57,7 @@ const rentalPitchSchema = z.object({
   min_duration_minutes: z.coerce.number().int().positive('Must be greater than 0'),
   max_duration_minutes: z.coerce.number().int().positive('Must be greater than 0'),
   is_active: z.boolean(),
+  manager_id: z.string().optional(),
   cancellation_policy_id: z.string().optional(),
 }).refine(v => v.max_duration_minutes >= v.min_duration_minutes, {
   message: 'Max duration must be ≥ min duration',
@@ -73,10 +74,11 @@ const DEFAULT_PITCH_VALUES: RentalPitchFormValues = {
   name_en: '', name_ar: '', sport_id: '', image_url: '', city: '', address: '',
   google_maps_url: '', surface_type: '', phone_number: '', max_players: undefined,
   price_per_hour: 30, slot_minutes: 30,
-  min_duration_minutes: 60, max_duration_minutes: 120, is_active: true, cancellation_policy_id: '',
+  min_duration_minutes: 60, max_duration_minutes: 120, is_active: true, manager_id: '', cancellation_policy_id: '',
 }
 
 const NO_POLICY = 'none'
+const NO_MANAGER = 'unassigned'
 
 function RatingStars({ rating }: { rating?: number }) {
   if (!rating) return <span className="text-xs text-muted-foreground">No ratings</span>
@@ -124,6 +126,14 @@ function RentalPitchesTab() {
     queryFn: async () => (await api.get<ApiResponse<CancellationPolicy[]>>('/admin/policies')).data.data,
   })
 
+  const { data: managers = [] } = useQuery({
+    queryKey: ['pitch-managers'],
+    queryFn: async () => {
+      const res = await api.get<ApiResponse<PaginatedResponse<AdminUser>>>('/admin/users?role=pitch_manager&limit=100')
+      return res.data.data.items ?? []
+    },
+  })
+
   const form = useForm<RentalPitchFormValues>({
     resolver: zodResolver(rentalPitchSchema),
     defaultValues: DEFAULT_PITCH_VALUES,
@@ -138,6 +148,7 @@ function RentalPitchesTab() {
       ...values,
       phone_number: values.phone_number?.trim() || undefined,
       max_players: values.max_players ?? undefined,
+      manager_id: values.manager_id || null,
       cancellation_policy_id: values.cancellation_policy_id || null,
       service_ids: selectedServiceIds,
       availabilities,
@@ -186,7 +197,7 @@ function RentalPitchesTab() {
       phone_number: p.phone_number ?? '', max_players: p.max_players,
       price_per_hour: p.price_per_hour, slot_minutes: p.slot_minutes,
       min_duration_minutes: p.min_duration_minutes, max_duration_minutes: p.max_duration_minutes,
-      is_active: p.is_active, cancellation_policy_id: p.cancellation_policy_id ?? '',
+      is_active: p.is_active, manager_id: p.manager_id ?? '', cancellation_policy_id: p.cancellation_policy_id ?? '',
     })
     setSheetOpen(true)
   }
@@ -240,6 +251,13 @@ function RentalPitchesTab() {
       ),
     },
     { key: 'rating', header: 'Rating', cell: row => <RatingStars rating={row.rating} /> },
+    {
+      key: 'manager',
+      header: 'Manager',
+      cell: row => row.manager
+        ? <span className="inline-flex items-center gap-1 text-sm"><UserCog className="w-3.5 h-3.5 text-amber-600" />{row.manager.first_name} {row.manager.last_name}</span>
+        : <span className="text-xs text-muted-foreground">Unassigned</span>,
+    },
     { key: 'bookings', header: 'Bookings', cell: row => <span className="text-sm">{row.booking_count ?? 0}</span> },
     { key: 'active', header: 'Status', cell: row => <Badge variant={row.is_active ? 'success' : 'secondary'}>{row.is_active ? 'Active' : 'Inactive'}</Badge> },
     {
@@ -379,6 +397,21 @@ function RentalPitchesTab() {
                       {policies.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={form.control} name="manager_id" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Pitch Manager</FormLabel>
+                  <Select onValueChange={v => field.onChange(v === NO_MANAGER ? '' : v)} value={field.value || NO_MANAGER}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value={NO_MANAGER}>Unassigned</SelectItem>
+                      {managers.map(m => <SelectItem key={m.id} value={m.id}>{m.first_name} {m.last_name} — {m.email}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Delegate this pitch to a pitch-manager account (they manage its bookings and blocks).</p>
                   <FormMessage />
                 </FormItem>
               )} />
