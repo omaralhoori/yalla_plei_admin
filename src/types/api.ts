@@ -651,3 +651,69 @@ export interface BlockSlotPayload {
 export interface CancelRentalBookingPayload {
   reason?: string
 }
+
+// ─── Subscriptions ────────────────────────────────────────────────────────────
+
+export type SubscriptionInterval = 'monthly' | 'annual'
+export type SubscriptionStatus = 'active' | 'cancelled' | 'expired' | 'pending'
+export type SubscriptionProvider = 'hyperpay' | 'apple' | 'google'
+
+export interface SubscriptionPlan {
+  id: string
+  code: string
+  name_ar: string
+  name_en: string
+  interval: SubscriptionInterval
+  price: number
+  currency: string
+  apple_product_id?: string
+  google_product_id?: string
+  is_active: boolean
+  sort_order: number
+}
+
+export interface SubscriptionPlanPayload {
+  code: string
+  name_ar: string
+  name_en: string
+  interval: SubscriptionInterval
+  price: number
+  currency: string
+  apple_product_id?: string
+  google_product_id?: string
+  is_active: boolean
+  sort_order: number
+}
+
+export interface SubscriptionConfig {
+  id?: string
+  early_join_minutes: number
+  points_multiplier: number
+  theme: string
+}
+
+export interface SubscriptionConfigPayload {
+  early_join_minutes?: number
+  points_multiplier?: number
+  theme?: string
+}
+
+export interface PlayerSubscription {
+  id: string
+  user_id: string
+  plan_id: string
+  interval: SubscriptionInterval
+  provider: SubscriptionProvider
+  status: SubscriptionStatus
+  current_period_start: string
+  current_period_end: string
+  auto_renew: boolean
+  cancelled_at?: string | null
+  plan?: SubscriptionPlan
+  user?: { id: string; first_name: string; last_name: string; email?: string; phone?: string }
+}
+
+export interface SubscriptionsListResponse {
+  subscriptions: PlayerSubscription[]
+  total: number
+}

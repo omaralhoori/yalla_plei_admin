@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   LayoutDashboard, Dumbbell, Users, MapPin, Wrench,
-  Calendar, CalendarCog, CreditCard, Receipt, Settings, Trophy, Gift, BookOpen, Film, Globe, History, KeyRound,
+  Calendar, CalendarCog, CreditCard, Receipt, Settings, Trophy, Gift, BookOpen, Film, Globe, History, KeyRound, Crown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -21,6 +21,7 @@ const navItems = [
   { to: '/financials', icon: CreditCard, labelKey: 'nav.financials' },
   { to: '/receipts', icon: Receipt, labelKey: 'nav.receipts' },
   { to: '/loyalty', icon: Gift, labelKey: 'nav.loyalty' },
+  { to: '/subscriptions', icon: Crown, labelKey: 'nav.subscriptions' },
   { to: '/highlights', icon: Film, labelKey: 'nav.highlights' },
   { to: '/audit-logs', icon: History, labelKey: 'nav.auditLogs' },
   { to: '/settings', icon: Settings, labelKey: 'nav.settings' },

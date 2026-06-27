@@ -1,9 +1,15 @@
 # Yalla Plei — Admin API Documentation
 
 > **Base URL**: `https://api.yallaplei.com/api/v1`  
-> **Version**: 3.10.0  
+> **Version**: 3.12.0  
 > **Audience**: Admin panel / back-office (role = `admin` or `manager`)  
-> **Last Updated**: 2026-06-25
+> **Last Updated**: 2026-06-27
+
+### What's New in 3.12.0
+- **Subscriptions (new section)**: manage the player subscription module. Create/edit/delete **monthly & annual plans** with pricing and store product ids (`/admin/subscription-plans`), tune the shared **benefits** — early-join minutes, loyalty points multiplier, and profile theme (`/admin/subscription-config`), and **manage members**: list/filter subscriptions, inspect one, and cancel on a player's behalf (`/admin/subscriptions`). Website billing runs on HyperPay (tokenized recurring charges); mobile runs on the App Store / Google Play. See **Subscriptions Management (Admin)**.
+
+### What's New in 3.11.0
+- **Online payment (HyperPay)**: cards & Apple Pay online payments via the HyperPay COPYandPAY widget. There are **no new admin endpoints** — it's configured entirely through **environment variables** (access token, channel entity ids, currency, etc.). See **Online Payment Configuration (HyperPay)**. Successful online payments appear in **Financial Transactions** with `source` = `card` / `apple_pay`.
 
 ### What's New in 3.10.0
 - **Pitch rental (new section)**: manage rentable pitches independent of match pitches — set per-weekday opening hours, slotting rules (30-min slots; 1h/1.5h/2h bookings), price-per-hour, `phone_number`, `max_players` (capacity), services and a cancellation policy (`POST/PUT/DELETE /admin/rental-pitches`). The pitch list is filterable by `day_of_week`. **Block a slot** when a pitch is booked off-platform (`POST /admin/rental-pitches/:id/block`), browse all rental bookings (`GET /admin/rental-bookings`), and cancel/refund or unblock (`POST /admin/rental-bookings/:id/cancel`). Each pitch tracks an aggregated rating (1–5, only from players who rented it) and a cumulative `booking_count`.
@@ -98,6 +104,9 @@ Obtain a Custom JWT the same way players do:
 | **LoyaltyReward** | Standalone |
 | **RewardRedemption** | Belongs to User+Reward |
 | **AuditLog** | Append-only mutation history: `table_name`, `record_id`, `action` (`create`/`update`/`delete`), `actor_id`, `created_at` |
+| **SubscriptionPlan** | Purchasable plan. Fields: `code` (unique), `interval` (`monthly`/`annual`), `price`, `currency`, `apple_product_id`, `google_product_id`, `is_active`, `sort_order` |
+| **SubscriptionConfig** | Single-row shared benefit config: `early_join_minutes`, `points_multiplier`, `theme` |
+| **PlayerSubscription** | Belongs to User (one current row per user) + Plan. Fields: `provider` (`hyperpay`/`apple`/`google`), `status`, `current_period_start/end`, `auto_renew` |
 
 ### Audit Fields (all mutable tables)
 
@@ -1734,6 +1743,205 @@ Cancel a rental booking or remove a block. Optional body `{ "reason": "..." }`. 
 player is notified; a block is simply removed, freeing the slot.
 
 **Response** `200`: the cancelled booking.
+
+---
+
+## Online Payment Configuration (HyperPay)
+
+Online card and **Apple Pay** payments are handled by **HyperPay** (OPPWA) using the
+[COPYandPAY](https://hyperpay.docs.oppwa.com/integrations/widget) widget. The players'
+endpoints (`POST /payments/checkout`, `GET /payments/checkout/status`) are documented in
+the Player API. There is **no admin API** to manage this — all settings (including the
+secrets) are read from **environment variables** on the backend, so nothing sensitive is
+stored in the database or exposed over the API.
+
+### Environment variables
+
+| Variable | Secret | Description |
+|----------|:------:|-------------|
+| `HYPERPAY_ENABLED` | – | `true` to enable online payment. When `false`, checkout endpoints return `503 online payment is not enabled`. |
+| `HYPERPAY_BASE_URL` | – | API/widget host. Test: `https://eu-test.oppwa.com`. Production: `https://eu-prod.oppwa.com`. |
+| `HYPERPAY_ACCESS_TOKEN` | ✅ | Bearer access token issued by HyperPay. |
+| `HYPERPAY_ENTITY_ID_CARDS` | ✅ | Channel **entityId** for card brands (VISA/MASTER/MADA…). |
+| `HYPERPAY_ENTITY_ID_APPLE_PAY` | ✅ | Channel **entityId** enabled for Apple Pay. |
+| `HYPERPAY_CURRENCY` | – | ISO currency for charges, e.g. `SAR` or `JOD`. |
+| `HYPERPAY_BRANDS_CARDS` | – | Widget `data-brands` for cards, e.g. `VISA MASTER MADA`. |
+| `HYPERPAY_BRANDS_APPLE_PAY` | – | Widget `data-brands` for Apple Pay, e.g. `APPLEPAY`. |
+| `HYPERPAY_SHOPPER_RESULT_URL` | – | Website page HyperPay redirects to after payment (receives `?resourcePath=...`). |
+
+> HyperPay typically issues a **separate entityId per channel** (one for cards, one for
+> Apple Pay). Set both; the backend picks the right one based on the player's chosen
+> `brand`.
+
+### What the backend does
+
+1. **Prepare checkout** — server-to-server `POST {BASE_URL}/v1/checkouts` with
+   `entityId`, `amount`, `currency`, `paymentType=DB`, `integrity=true`, and a unique
+   `merchantTransactionId`; returns a `checkoutId` + `integrity` hash (PCI DSS v4).
+2. **Status** — `GET {BASE_URL}{resourcePath}?entityId=...`; the result code decides
+   success/pending/failure. On success the related match/rental booking is confirmed (or
+   the wallet credited) and a **Financial Transaction** is recorded.
+
+### Front-end / ops checklist (website)
+
+- Load the widget script with the returned `integrity` and `crossorigin="anonymous"`.
+- Add the required **Content-Security-Policy** for the HyperPay host (per the HyperPay PCI
+  v4 guidance), using a per-request nonce on your own scripts.
+- For **Apple Pay**: serve the site over HTTPS, host the Apple Pay domain-association file,
+  and register the domain with Apple/HyperPay; ensure the Apple Pay entity is enabled.
+- Switch `HYPERPAY_BASE_URL` to the production host and use production credentials when
+  going live.
+
+---
+
+## Subscriptions Management (Admin)
+
+The player subscription module lets players subscribe **monthly** or **annually** to
+unlock premium perks. Admins manage three things: the **plans** (pricing), the shared
+**benefit configuration** (the perks themselves), and the **members** (active/past
+subscriptions).
+
+**How players are billed**
+- **Website** → **HyperPay** (card / Apple Pay). The card is tokenized so renewals can be
+  charged automatically; uses the same HyperPay configuration as **Online Payment**.
+- **Mobile** → **Apple App Store** / **Google Play**. The mobile app maps a plan to a
+  store product via `apple_product_id` / `google_product_id` and reports purchases to the
+  backend.
+
+> A background worker expires subscriptions automatically once their paid period ends.
+
+### The benefits
+
+| Benefit | Config field | Effect |
+|---------|--------------|--------|
+| Early match access | `early_join_minutes` | Subscribers may register for a match this many minutes **before** the public registration window opens. |
+| Boosted loyalty points | `points_multiplier` | A subscriber's per-booking points are multiplied by this factor (applied by the points engine). |
+| Premium profile theme | `theme` | Theme key surfaced on the player profile (`is_subscribed` + `subscription_theme`) so other players see their premium profile. |
+
+---
+
+### Plans
+
+#### `GET /api/v1/admin/subscription-plans`
+Lists **all** plans (active and inactive), ordered by `sort_order`, then `price`.
+
+#### `POST /api/v1/admin/subscription-plans`
+Creates a plan.
+
+**Request:**
+```json
+{
+  "code": "annual",
+  "name_ar": "بريميوم سنوي",
+  "name_en": "Premium Annual",
+  "interval": "annual",
+  "price": 299.0,
+  "currency": "SAR",
+  "apple_product_id": "com.yallaplei.sub.annual",
+  "google_product_id": "sub_annual",
+  "is_active": true,
+  "sort_order": 2
+}
+```
+- `code` (required, unique): stable identifier, e.g. `monthly` / `annual`.
+- `interval` (required): `monthly` | `annual`.
+- `price`: charged amount per period (website billing). `currency` defaults to `SAR`.
+- `apple_product_id` / `google_product_id`: store product ids the mobile apps map to this plan.
+- `is_active` (default `true`), `sort_order` (display order).
+
+**Response** `201`: the created plan.
+
+#### `PUT /api/v1/admin/subscription-plans/:id`
+Updates a plan. All fields optional; send only what changes (`name_ar`, `name_en`,
+`price`, `currency`, `apple_product_id`, `google_product_id`, `is_active`, `sort_order`).
+Changing `price` affects **future** charges/renewals.
+
+#### `DELETE /api/v1/admin/subscription-plans/:id`
+Deletes a plan.
+
+**Errors:** `404 subscription plan not found`, `400 invalid request` (e.g. bad `interval`),
+`409` on duplicate `code`.
+
+---
+
+### Benefit configuration
+
+#### `GET /api/v1/admin/subscription-config`
+Returns the single shared benefit configuration (created with defaults on first read).
+
+**Response** `200`:
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "early_join_minutes": 15,
+    "points_multiplier": 2,
+    "theme": "premium"
+  }
+}
+```
+
+#### `PUT /api/v1/admin/subscription-config`
+Updates the benefit configuration. All fields optional.
+
+**Request:**
+```json
+{
+  "early_join_minutes": 20,
+  "points_multiplier": 3,
+  "theme": "gold"
+}
+```
+- `early_join_minutes`: how many minutes before public registration subscribers may join.
+- `points_multiplier`: loyalty-points multiplier for subscribers (e.g. `2` = double points).
+- `theme`: profile theme key the app renders for subscribers.
+
+**Response** `200`: the updated configuration. Changes apply immediately to all active subscribers.
+
+---
+
+### Members
+
+#### `GET /api/v1/admin/subscriptions`
+Lists player subscriptions.
+
+**Query params:** `status` (`active` | `cancelled` | `expired` | `pending`),
+`provider` (`hyperpay` | `apple` | `google`), `limit` (default 20), `offset`.
+
+**Response** `200`:
+```json
+{
+  "success": true,
+  "data": {
+    "subscriptions": [
+      {
+        "id": "uuid",
+        "user_id": "uuid",
+        "plan_id": "uuid",
+        "interval": "monthly",
+        "provider": "hyperpay",
+        "status": "active",
+        "current_period_start": "2026-06-27T10:00:00Z",
+        "current_period_end": "2026-07-27T10:00:00Z",
+        "auto_renew": true,
+        "cancelled_at": null,
+        "plan": { "id": "uuid", "code": "monthly", "interval": "monthly", "price": 29.0 }
+      }
+    ],
+    "total": 1
+  }
+}
+```
+
+#### `GET /api/v1/admin/subscriptions/:id`
+Returns a single subscription with its plan.
+
+#### `POST /api/v1/admin/subscriptions/:id/cancel`
+Cancels a subscription on the player's behalf. Auto-renew is turned off and the benefits
+remain until `current_period_end`; for HyperPay the recurring schedule is stopped.
+
+**Errors:** `404 subscription not found`.
 
 ---
 
