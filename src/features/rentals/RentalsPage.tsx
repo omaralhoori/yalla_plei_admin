@@ -52,6 +52,14 @@ const rentalPitchSchema = z.object({
     v => (v === '' || v == null ? undefined : v),
     z.coerce.number().int().positive('Must be greater than 0').optional(),
   ),
+  latitude: z.preprocess(
+    v => (v === '' || v == null ? undefined : v),
+    z.coerce.number().min(-90, 'Must be ≥ -90').max(90, 'Must be ≤ 90').optional(),
+  ),
+  longitude: z.preprocess(
+    v => (v === '' || v == null ? undefined : v),
+    z.coerce.number().min(-180, 'Must be ≥ -180').max(180, 'Must be ≤ 180').optional(),
+  ),
   price_per_hour: z.coerce.number().min(0, 'Must be 0 or more'),
   slot_minutes: z.coerce.number().int().positive('Must be greater than 0'),
   min_duration_minutes: z.coerce.number().int().positive('Must be greater than 0'),
@@ -73,6 +81,7 @@ const DEFAULT_SCHEDULE: DaySchedule[] = WEEKDAYS.map(() => ({ enabled: false, op
 const DEFAULT_PITCH_VALUES: RentalPitchFormValues = {
   name_en: '', name_ar: '', sport_id: '', image_url: '', city: '', address: '',
   google_maps_url: '', surface_type: '', phone_number: '', max_players: undefined,
+  latitude: undefined, longitude: undefined,
   price_per_hour: 30, slot_minutes: 30,
   min_duration_minutes: 60, max_duration_minutes: 120, is_active: true, manager_id: '', cancellation_policy_id: '',
 }
@@ -148,6 +157,8 @@ function RentalPitchesTab() {
       ...values,
       phone_number: values.phone_number?.trim() || undefined,
       max_players: values.max_players ?? undefined,
+      latitude: values.latitude ?? null,
+      longitude: values.longitude ?? null,
       manager_id: values.manager_id || null,
       cancellation_policy_id: values.cancellation_policy_id || null,
       service_ids: selectedServiceIds,
@@ -195,6 +206,7 @@ function RentalPitchesTab() {
       name_en: p.name_en, name_ar: p.name_ar, sport_id: p.sport_id, image_url: p.image_url,
       city: p.city, address: p.address, google_maps_url: p.google_maps_url, surface_type: p.surface_type,
       phone_number: p.phone_number ?? '', max_players: p.max_players,
+      latitude: p.latitude ?? undefined, longitude: p.longitude ?? undefined,
       price_per_hour: p.price_per_hour, slot_minutes: p.slot_minutes,
       min_duration_minutes: p.min_duration_minutes, max_duration_minutes: p.max_duration_minutes,
       is_active: p.is_active, manager_id: p.manager_id ?? '', cancellation_policy_id: p.cancellation_policy_id ?? '',
@@ -334,6 +346,41 @@ function RentalPitchesTab() {
               <FormField control={form.control} name="google_maps_url" render={({ field }) => (
                 <FormItem><FormLabel>Google Maps URL</FormLabel><FormControl><Input type="url" placeholder="https://maps.google.com/..." {...field} /></FormControl><FormMessage /></FormItem>
               )} />
+              <div className="grid grid-cols-2 gap-3">
+                <FormField control={form.control} name="latitude" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Latitude</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="any"
+                        dir="ltr"
+                        placeholder="e.g. 31.9539"
+                        value={field.value ?? ''}
+                        onChange={e => field.onChange(e.target.value === '' ? undefined : e.target.value)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="longitude" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Longitude</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="any"
+                        dir="ltr"
+                        placeholder="e.g. 35.9106"
+                        value={field.value ?? ''}
+                        onChange={e => field.onChange(e.target.value === '' ? undefined : e.target.value)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <p className="col-span-2 text-xs text-muted-foreground -mt-1">Optional decimal coordinates — lets players sort pitches by distance from their location.</p>
+              </div>
               <FormField control={form.control} name="surface_type" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Surface Type</FormLabel>

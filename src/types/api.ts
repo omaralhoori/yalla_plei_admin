@@ -589,6 +589,8 @@ export interface RentalPitch {
   surface_type: string
   phone_number?: string
   max_players?: number
+  latitude?: number | null
+  longitude?: number | null
   price_per_hour: number
   slot_minutes: number
   min_duration_minutes: number
@@ -616,6 +618,8 @@ export interface RentalPitchPayload {
   surface_type: string
   phone_number?: string
   max_players?: number
+  latitude?: number | null
+  longitude?: number | null
   price_per_hour: number
   slot_minutes: number
   min_duration_minutes: number

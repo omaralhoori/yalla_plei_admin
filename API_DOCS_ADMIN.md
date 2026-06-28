@@ -1,9 +1,12 @@
 # Yalla Plei — Admin API Documentation
 
 > **Base URL**: `https://api.yallaplei.com/api/v1`  
-> **Version**: 3.13.0  
+> **Version**: 3.14.0  
 > **Audience**: Admin panel / back-office (role = `admin` or `manager`)  
-> **Last Updated**: 2026-06-27
+> **Last Updated**: 2026-06-28
+
+### What's New in 3.14.0
+- **Rental pitch coordinates**: rentable pitches now accept `latitude` / `longitude` on create & update. Players can then **sort the pitch list by distance** from their location (in addition to rating and price) — see the Player API. Coordinates are optional.
 
 ### What's New in 3.13.0
 - **Pitch managers (new role)**: a new user role `pitch_manager`. Create the account with `POST /admin/users` (`"role": "pitch_manager"`) and assign one or more rentable pitches to it with the new `manager_id` field on `POST/PUT /admin/rental-pitches`. A pitch manager has its own API (see **`API_DOCS_PITCH_MANAGER.md`**) where it sees only its pitches, views their bookings (booker **name + phone** only), blocks/unblocks off-platform slots, and is notified of new bookings. A **grace window** (`DefaultRentalHoldMinutes`, 15 min) prevents a manager from blocking a slot a player is mid-booking; abandoned unpaid holds are auto-released after the window.
@@ -1681,6 +1684,8 @@ pitches open that weekday).
   "google_maps_url": "https://maps.google.com/...",
   "surface_type": "grass",
   "phone_number": "+962790000000",
+  "latitude": 31.9539,
+  "longitude": 35.9106,
   "max_players": 14,
   "price_per_hour": 30.0,
   "slot_minutes": 30,
@@ -1701,6 +1706,7 @@ pitches open that weekday).
 |-------|----------|-------|
 | `name_ar`, `name_en`, `sport_id` | ✅ | Names are unique |
 | `phone_number` | ❌ | Pitch contact phone shown to players |
+| `latitude` / `longitude` | ❌ | Decimal-degree coordinates. Enable players to **sort pitches by distance** from their location; omit (`null`) if unknown |
 | `max_players` | ❌ | Maximum players the pitch can host (capacity) |
 | `price_per_hour` | ❌ | Booking price = `price_per_hour × minutes / 60` |
 | `slot_minutes` | ❌ | Default `30` |
@@ -1832,16 +1838,33 @@ stored in the database or exposed over the API.
 | `HYPERPAY_BRANDS_CARDS` | – | Widget `data-brands` for cards, e.g. `VISA MASTER MADA`. |
 | `HYPERPAY_BRANDS_APPLE_PAY` | – | Widget `data-brands` for Apple Pay, e.g. `APPLEPAY`. |
 | `HYPERPAY_SHOPPER_RESULT_URL` | – | Website page HyperPay redirects to after payment (receives `?resourcePath=...`). |
+| `HYPERPAY_MERCHANT_URL` | – | The merchant's website URL, sent as `merchant.url` (required for 3-D Secure). Defaults to `APP_URL`. |
+| `HYPERPAY_TEST_MODE` | – | `true` to send the **test-server-only** parameters (`testMode=EXTERNAL`, `customParameters[3DS2_enrolled]=true`, `customParameters[3DS2_flow]=challenge`). Auto-defaults to `true` when `HYPERPAY_BASE_URL` contains `test`. **Set to `false` in production.** |
+| `HYPERPAY_BILLING_STREET` | – | Default `billing.street1` (3DS risk data) when the customer has no stored address. |
+| `HYPERPAY_BILLING_CITY` | – | Default `billing.city`. Overridden by the customer's city when known. |
+| `HYPERPAY_BILLING_STATE` | – | Default `billing.state`. |
+| `HYPERPAY_BILLING_COUNTRY` | – | Default `billing.country`, ISO Alpha-2 (e.g. `SA`). Overridden by the customer's country code when known. |
+| `HYPERPAY_BILLING_POSTCODE` | – | Default `billing.postcode`. |
 
 > HyperPay typically issues a **separate entityId per channel** (one for cards, one for
 > Apple Pay). Set both; the backend picks the right one based on the player's chosen
 > `brand`.
 
+> **Test server (3-D Secure)**: HyperPay's integrator test environment requires
+> `testMode=EXTERNAL` plus the `3DS2_enrolled`/`3DS2_flow=challenge` custom parameters and a
+> full `merchant.url` + `billing.*` block. These are sent automatically while
+> `HYPERPAY_TEST_MODE=true` (auto-enabled on the test host). Billing fields fall back to the
+> `HYPERPAY_BILLING_*` defaults and are enriched with the customer's real country/city when
+> available. Make sure to set `HYPERPAY_TEST_MODE=false` and the proper `HYPERPAY_MERCHANT_URL`
+> in production.
+
 ### What the backend does
 
 1. **Prepare checkout** — server-to-server `POST {BASE_URL}/v1/checkouts` with
-   `entityId`, `amount`, `currency`, `paymentType=DB`, `integrity=true`, and a unique
-   `merchantTransactionId`; returns a `checkoutId` + `integrity` hash (PCI DSS v4).
+   `entityId`, `amount`, `currency`, `paymentType=DB`, `integrity=true`, `merchant.url`,
+   the customer (`customer.email/givenName/surname`) + `billing.*` block, and a unique
+   `merchantTransactionId`; returns a `checkoutId` + `integrity` hash (PCI DSS v4). On the
+   test server it also sends `testMode=EXTERNAL` and the `3DS2` simulation parameters.
 2. **Status** — `GET {BASE_URL}{resourcePath}?entityId=...`; the result code decides
    success/pending/failure. On success the related match/rental booking is confirmed (or
    the wallet credited) and a **Financial Transaction** is recorded.
