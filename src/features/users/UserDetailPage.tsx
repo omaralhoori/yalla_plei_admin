@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast'
 import { api } from '@/lib/api'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
 import StatusBadge from '@/components/shared/StatusBadge'
+import SideBadge from '@/components/shared/SideBadge'
 import type { ApiResponse, PaginatedResponse, AdminUserDetail, AdjustPointsPayload, AdminBooking } from '@/types/api'
 
 const adjustPointsSchema = z.object({
@@ -224,6 +225,8 @@ export default function UserDetailPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
+                    <SideBadge side={b.side} />
+                    {b.is_goalkeeper && <Badge variant="secondary" className="text-xs">GK</Badge>}
                     <StatusBadge status={b.status} />
                     <span className="font-semibold text-sm">{formatCurrency(b.match?.join_price ?? 0)}</span>
                   </div>

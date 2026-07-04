@@ -386,6 +386,7 @@ export interface RewardPayload {
 // ─── Booking ──────────────────────────────────────────────────────────────────
 
 export type BookingStatus = 'confirmed' | 'cancelled' | 'pending' | 'completed' | 'pending_payment' | 'pending_approval' | 'waitlist'
+export type BookingSide = 'yellow' | 'blue'
 
 export interface AdminBooking {
   id: string
@@ -393,6 +394,8 @@ export interface AdminBooking {
   match_id: string
   pitch_id?: string
   status: BookingStatus
+  side?: BookingSide
+  is_goalkeeper?: boolean
   date_time?: string
   goals_count?: number
   assists_count?: number

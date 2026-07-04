@@ -1,9 +1,12 @@
 # Yalla Plei — Admin API Documentation
 
 > **Base URL**: `https://api.yallaplei.com/api/v1`  
-> **Version**: 3.17.0  
+> **Version**: 3.18.0  
 > **Audience**: Admin panel / back-office (role = `admin` or `manager`)  
 > **Last Updated**: 2026-07-04
+
+### What's New in 3.18.0
+- **Yellow / Blue match squads**: bookings now carry a `side` (`yellow` or `blue`) assigned automatically at registration to keep teams balanced. Referees manage squads via the Referee API (`GET /referee/matches/:id/players`, `PUT /referee/bookings/:id/team`, `POST /referee/bookings/:id/swap-team`).
 
 ### What's New in 3.17.0
 - **Birthday greetings (automatic)**: a daily background job (08:00 Asia/Amman) finds users whose `date_of_birth` matches today and sends each a **push notification** and **SMS** congratulation. Templates are customisable via `PUT /admin/settings/birthday-messages` (`{name}` placeholder). Each user receives at most one greeting per calendar year (tracked via notification type `birthday`).
@@ -101,7 +104,7 @@ Obtain a Custom JWT the same way players do:
 | **Service** | `type`: `"facility"` (pitch amenity) or `"feature"` (match add-on). M2M with Pitches and Matches |
 | **Pitch** | Belongs to Sport, M2M with Services (`type=facility`). Fields: `city`, `address`, `surface_type` |
 | **Match** | Belongs to Sport+Pitch+Referee(User), Has many Bookings, M2M Services (`type=feature`), Has Policy. Fields: `duration`, `registration_opens_hours_before` |
-| **MatchBooking** | Belongs to User+Match+Pitch. Fields: `yellow_cards`, `red_cards`, `rating` (1.0–10.0), `points_earned`, `price_paid` (amount charged after level discount) |
+| **MatchBooking** | Belongs to User+Match+Pitch. Fields: `side` (`yellow`/`blue`, auto-assigned for balance), `yellow_cards`, `red_cards`, `rating` (1.0–10.0), `points_earned`, `price_paid`, `is_goalkeeper` |
 | **WaitlistEntry** | Belongs to User+Match. `status`: `waiting`/`offered`/`accepted`/`expired`/`cancelled`. Durable mirror of the Redis-backed queue + offer |
 | **AppSetting** | Key/value store for admin-configurable runtime settings (e.g. `waitlist_offer_duration_minutes`, `deposit_instructions`) |
 | **PaymentReceipt** | Belongs to User. Player-uploaded bank-deposit proof. `status`: `pending`/`approved`/`rejected`; on approval the `approved_amount` is credited to the wallet |

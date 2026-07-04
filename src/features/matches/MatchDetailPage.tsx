@@ -16,10 +16,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import StatusBadge from '@/components/shared/StatusBadge'
+import SideBadge from '@/components/shared/SideBadge'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import ImageUpload from '@/components/shared/ImageUpload'
 import { useToast } from '@/hooks/use-toast'
@@ -220,6 +222,11 @@ export default function MatchDetailPage() {
   const totalSlots = match ? parseTotalSlots(match.players_format) : 0
   const confirmedCount = bookings.filter(b => b.status === 'confirmed' || b.status === 'completed').length
   const availableSlots = Math.max(0, totalSlots - confirmedCount)
+  const squadBookings = bookings.filter(b =>
+    (b.status === 'confirmed' || b.status === 'completed' || b.status === 'pending_approval') && b.side
+  )
+  const yellowCount = squadBookings.filter(b => b.side === 'yellow').length
+  const blueCount = squadBookings.filter(b => b.side === 'blue').length
   const matchIso = match ? matchApiToUtcIso(match.date ?? '', match.time ?? '') : ''
 
   // ─── Booking columns ──────────────────────────────────────────────────────────
@@ -244,6 +251,16 @@ export default function MatchDetailPage() {
       key: 'status',
       header: 'Status',
       cell: row => <StatusBadge status={row.status} />,
+    },
+    {
+      key: 'side',
+      header: 'Team',
+      cell: row => (
+        <div className="flex items-center gap-1.5">
+          <SideBadge side={row.side} />
+          {row.is_goalkeeper && <Badge variant="secondary" className="text-xs">GK</Badge>}
+        </div>
+      ),
     },
     {
       key: 'amount',
@@ -365,10 +382,18 @@ export default function MatchDetailPage() {
 
       {/* Capacity stats */}
       {!matchLoading && totalSlots > 0 && (
-        <div className="grid grid-cols-3 gap-4">
-          <SlotBadge count={confirmedCount} label="Booked Slots" color="text-emerald-600" bg="bg-emerald-50" />
-          <SlotBadge count={availableSlots} label="Available Slots" color="text-blue-600" bg="bg-blue-50" />
-          <SlotBadge count={totalSlots} label="Total Slots" color="text-slate-700" bg="bg-muted" />
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-4">
+            <SlotBadge count={confirmedCount} label="Booked Slots" color="text-emerald-600" bg="bg-emerald-50" />
+            <SlotBadge count={availableSlots} label="Available Slots" color="text-blue-600" bg="bg-blue-50" />
+            <SlotBadge count={totalSlots} label="Total Slots" color="text-slate-700" bg="bg-muted" />
+          </div>
+          {(yellowCount > 0 || blueCount > 0) && (
+            <div className="grid grid-cols-2 gap-4">
+              <SlotBadge count={yellowCount} label="Yellow Squad" color="text-yellow-700" bg="bg-yellow-50" />
+              <SlotBadge count={blueCount} label="Blue Squad" color="text-blue-600" bg="bg-blue-50" />
+            </div>
+          )}
         </div>
       )}
 
@@ -378,6 +403,9 @@ export default function MatchDetailPage() {
           <CardTitle className="text-base">Registered Players</CardTitle>
           <CardDescription>
             {bookingsLoading ? 'Loading…' : `${bookings.length} booking${bookings.length !== 1 ? 's' : ''} — ${confirmedCount} confirmed`}
+            {!bookingsLoading && (yellowCount > 0 || blueCount > 0) && (
+              <span className="text-muted-foreground"> · Squads auto-balanced at registration (referees can adjust via the Referee app)</span>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">

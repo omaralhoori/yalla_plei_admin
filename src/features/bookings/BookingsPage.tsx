@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { RefreshCw, XCircle, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -11,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import DataTable, { type Column } from '@/components/shared/DataTable'
 import PageHeader from '@/components/shared/PageHeader'
 import StatusBadge from '@/components/shared/StatusBadge'
+import SideBadge from '@/components/shared/SideBadge'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { useToast } from '@/hooks/use-toast'
 import { usePagination } from '@/hooks/usePagination'
@@ -126,6 +128,17 @@ export default function BookingsPage() {
       header: 'Status',
       cell: row => <StatusBadge status={row.status} />,
       csvValue: row => row.status,
+    },
+    {
+      key: 'side',
+      header: 'Team',
+      cell: row => (
+        <div className="flex items-center gap-1.5">
+          <SideBadge side={row.side} />
+          {row.is_goalkeeper && <Badge variant="secondary" className="text-xs">GK</Badge>}
+        </div>
+      ),
+      csvValue: row => row.side ?? '',
     },
     {
       key: 'amount',
