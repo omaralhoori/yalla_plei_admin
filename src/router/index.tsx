@@ -47,6 +47,7 @@ const UsersPage = lazy(() => import('@/features/users/UsersPage'))
 const UserDetailPage = lazy(() => import('@/features/users/UserDetailPage'))
 const LoyaltyPage = lazy(() => import('@/features/loyalty/LoyaltyPage'))
 const HighlightsPage = lazy(() => import('@/features/highlights/HighlightsPage'))
+const PromoItemsPage = lazy(() => import('@/features/promo/PromoItemsPage'))
 const CountriesPage = lazy(() => import('@/features/locations/CountriesPage'))
 const AuditLogsPage = lazy(() => import('@/features/audit/AuditLogsPage'))
 const RentalsPage = lazy(() => import('@/features/rentals/RentalsPage'))
@@ -100,6 +101,7 @@ export const router = createBrowserRouter([
       { path: '/receipts', element: <ReceiptsPage />, errorElement: <PageError /> },
       { path: '/loyalty', element: <LoyaltyPage />, errorElement: <PageError /> },
       { path: '/highlights', element: <HighlightsPage />, errorElement: <PageError /> },
+      { path: '/promo-items', element: <PromoItemsPage />, errorElement: <PageError /> },
       { path: '/countries', element: <CountriesPage />, errorElement: <PageError /> },
       { path: '/rentals', element: <RentalsPage />, errorElement: <PageError /> },
       { path: '/subscriptions', element: <SubscriptionsPage />, errorElement: <PageError /> },

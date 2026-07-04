@@ -1,9 +1,12 @@
 # Yalla Plei — Admin API Documentation
 
 > **Base URL**: `https://api.yallaplei.com/api/v1`  
-> **Version**: 3.18.0  
+> **Version**: 3.19.0  
 > **Audience**: Admin panel / back-office (role = `admin` or `manager`)  
 > **Last Updated**: 2026-07-04
+
+### What's New in 3.19.0
+- **Promo items (offers / announcements / ads)**: full CRUD at `/admin/promo-items`. Define bilingual content (image, title, short & long descriptions), choose a type (`offer`, `announcement`, `ad`), set sort order, active flag, and optional schedule window. Active items appear to players via `GET /promo-items`. See **Promo Items Management (Admin)**.
 
 ### What's New in 3.18.0
 - **Yellow / Blue match squads**: bookings now carry a `side` (`yellow` or `blue`) assigned automatically at registration to keep teams balanced. Referees manage squads via the Referee API (`GET /referee/matches/:id/players`, `PUT /referee/bookings/:id/team`, `POST /referee/bookings/:id/swap-team`).
@@ -1570,6 +1573,96 @@ Rejects a `pending` receipt. Nothing is credited to the wallet.
 
 ### `DELETE /api/v1/admin/highlights/:id`
 **Response** `200`: `{ "message": "highlight deleted" }`
+
+---
+
+## Promo Items Management (Admin)
+
+Manage offers, announcements, and advertisements shown to players in the mobile/web app.
+
+| Type | Use case |
+|------|----------|
+| `offer` | Discounts and special deals |
+| `announcement` | Platform news and updates |
+| `ad` | Sponsored content |
+
+Upload images via the existing upload endpoint, then reference the returned path in `image_url`.
+
+### `GET /api/v1/admin/promo-items`
+**Auth**: admin or manager  
+**Query Params**:
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `type` | string | Filter: `offer`, `announcement`, `ad` |
+| `is_active` | bool | `true` / `false` |
+| `limit` | int | Default 20 |
+| `offset` | int | Pagination offset |
+
+**Response** `200`: paginated list of promo items (includes inactive and scheduled items).
+
+---
+
+### `GET /api/v1/admin/promo-items/:id`
+**Auth**: admin or manager
+
+**Response** `200`: single promo item object.
+
+**Error** `404`: not found.
+
+---
+
+### `POST /api/v1/admin/promo-items`
+**Auth**: admin or manager
+
+**Request Body**:
+```json
+{
+  "type": "offer",
+  "image_url": "/uploads/promo/summer.jpg",
+  "title_ar": "عرض الصيف",
+  "title_en": "Summer Offer",
+  "short_description_ar": "خصم 20% على المباريات",
+  "short_description_en": "20% off match bookings",
+  "long_description_ar": "تفاصيل العرض الكاملة بالعربية…",
+  "long_description_en": "Full offer details in English…",
+  "is_active": true,
+  "sort_order": 0,
+  "show_from": "2026-07-01T00:00:00Z",
+  "show_to": "2026-08-31T23:59:59Z"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | string | ✅ | `offer`, `announcement`, or `ad` |
+| `image_url` | string | ✅ | Image path or URL |
+| `title_ar` / `title_en` | string | ✅ | Bilingual title |
+| `short_description_ar` / `short_description_en` | string | ❌ | Short text for list/card views |
+| `long_description_ar` / `long_description_en` | string | ❌ | Full text for detail screen |
+| `is_active` | bool | ❌ | Default `true` |
+| `sort_order` | int | ❌ | Lower values appear first (default `0`) |
+| `show_from` / `show_to` | ISO 8601 | ❌ | Optional visibility window |
+
+**Response** `201`: created promo item.
+
+**Error** `400`: invalid `type` or malformed body.
+
+---
+
+### `PUT /api/v1/admin/promo-items/:id`
+**Auth**: admin or manager
+
+**Request Body**: same fields as POST (all optional).
+
+**Response** `200`: updated promo item.
+
+---
+
+### `DELETE /api/v1/admin/promo-items/:id`
+**Auth**: admin or manager
+
+**Response** `200`: `{ "message": "promo item deleted" }`
 
 ---
 

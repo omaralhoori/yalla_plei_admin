@@ -569,6 +569,43 @@ export interface HighlightPayload {
   show_to?: string
 }
 
+// ─── Promo Items ──────────────────────────────────────────────────────────────
+
+export type PromoItemType = 'offer' | 'announcement' | 'ad'
+
+export interface PromoItem {
+  id: string
+  type: PromoItemType
+  image_url: string
+  title_ar: string
+  title_en: string
+  short_description_ar?: string
+  short_description_en?: string
+  long_description_ar?: string
+  long_description_en?: string
+  is_active: boolean
+  sort_order: number
+  show_from?: string
+  show_to?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface PromoItemPayload {
+  type: PromoItemType
+  image_url: string
+  title_ar: string
+  title_en: string
+  short_description_ar?: string
+  short_description_en?: string
+  long_description_ar?: string
+  long_description_en?: string
+  is_active?: boolean
+  sort_order?: number
+  show_from?: string
+  show_to?: string
+}
+
 // ─── Pitch Rental ─────────────────────────────────────────────────────────────
 
 // day_of_week: 0 = Sunday … 6 = Saturday; times are "HH:MM"
