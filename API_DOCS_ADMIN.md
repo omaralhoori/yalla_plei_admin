@@ -1,9 +1,12 @@
 # Yalla Plei — Admin API Documentation
 
 > **Base URL**: `https://api.yallaplei.com/api/v1`  
-> **Version**: 3.16.0  
+> **Version**: 3.17.0  
 > **Audience**: Admin panel / back-office (role = `admin` or `manager`)  
 > **Last Updated**: 2026-07-04
+
+### What's New in 3.17.0
+- **Birthday greetings (automatic)**: a daily background job (08:00 Asia/Amman) finds users whose `date_of_birth` matches today and sends each a **push notification** and **SMS** congratulation. Templates are customisable via `PUT /admin/settings/birthday-messages` (`{name}` placeholder). Each user receives at most one greeting per calendar year (tracked via notification type `birthday`).
 
 ### What's New in 3.16.0
 - **Goalkeeper participation**: players can join a match as goalkeeper (`participate_as_goalkeeper` on booking/reserve). Configure the discount via `PUT /admin/settings/goalkeeper-discount` (default **50%** off the join price after level discount). Max **2** goalkeepers per match. New loyalty point rule `goalkeeper_participation` (seeded on startup). Bookings expose `is_goalkeeper`; player stats include `goalkeeper_matches`.
@@ -1319,6 +1322,30 @@ goalkeeper. The discount applies **after** any level discount on the match join 
 ```
 
 **Error** `400`: `percent must be between 0 and 100`
+
+---
+
+### `PUT /api/v1/admin/settings/birthday-messages`
+**Auth**: admin or manager  
+Customises the templates used by the **daily birthday worker** (runs at **08:00 Asia/Amman**).
+Every user with a `date_of_birth` matching today's month/day receives a push notification
+and an SMS (when a phone number is on file). Use `{name}` as a placeholder for the
+user's first name. Each user is greeted at most **once per calendar year**.
+
+**Request Body** (all fields optional — omitted fields keep their current value):
+```json
+{
+  "push_title": "عيد ميلاد سعيد! 🎂",
+  "push_body": "كل عام وأنت بخير يا {name}! نتمنى لك عاماً مليان بطولات على الملعب — يلا بلّع",
+  "sms_message": "يلا بلّع: عيد ميلاد سعيد يا {name}! كل عام وأنت بخير 🎂"
+}
+```
+
+**Response** `200`: returns the effective templates after the update.
+
+> Users must have `date_of_birth` set on their profile (registration or
+> `PUT /users/profile`) to be eligible. The greeting appears in notification
+> history with `type: "birthday"`.
 
 ---
 

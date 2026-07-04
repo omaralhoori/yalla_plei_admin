@@ -661,6 +661,20 @@ export interface CancelRentalBookingPayload {
   reason?: string
 }
 
+// ─── Birthday Messages ────────────────────────────────────────────────────────
+
+export interface BirthdayMessages {
+  push_title: string
+  push_body: string
+  sms_message: string
+}
+
+export interface BirthdayMessagesPayload {
+  push_title?: string
+  push_body?: string
+  sms_message?: string
+}
+
 // ─── Subscriptions ────────────────────────────────────────────────────────────
 
 export type SubscriptionInterval = 'monthly' | 'annual'

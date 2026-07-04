@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, Construction, Hourglass, Landmark, Clock, MessageSquareText, Shield } from 'lucide-react'
+import { Plus, Pencil, Trash2, Construction, Hourglass, Landmark, Clock, MessageSquareText, Shield, Cake } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -20,13 +20,22 @@ import PageHeader from '@/components/shared/PageHeader'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { useToast } from '@/hooks/use-toast'
 import { api } from '@/lib/api'
-import type { ApiResponse, CancellationPolicy, PolicyPayload, AppSetting, PointRule, PointRulePayload } from '@/types/api'
+import type { ApiResponse, CancellationPolicy, PolicyPayload, AppSetting, PointRule, PointRulePayload, BirthdayMessages, BirthdayMessagesPayload } from '@/types/api'
 
 const WAITLIST_OFFER_KEY = 'waitlist_offer_duration_minutes'
 const DEPOSIT_INSTRUCTIONS_KEY = 'deposit_instructions'
 const REGISTRATION_INSTRUCTIONS_KEY = 'registration_instructions'
 const GOALKEEPER_DISCOUNT_KEY = 'goalkeeper_discount_percent'
 const GOALKEEPER_POINT_RULE_KEY = 'goalkeeper_participation'
+const BIRTHDAY_PUSH_TITLE_KEY = 'birthday_push_title'
+const BIRTHDAY_PUSH_BODY_KEY = 'birthday_push_body'
+const BIRTHDAY_SMS_KEY = 'birthday_sms_message'
+
+const DEFAULT_BIRTHDAY_MESSAGES: BirthdayMessages = {
+  push_title: 'عيد ميلاد سعيد! 🎂',
+  push_body: 'كل عام وأنت بخير يا {name}! نتمنى لك عاماً مليان بطولات على الملعب — يلا بلّع',
+  sms_message: 'يلا بلّع: عيد ميلاد سعيد يا {name}! كل عام وأنت بخير 🎂',
+}
 
 const refundTierSchema = z.object({
   hours_before: z.coerce.number().int('Whole number').min(0, 'Must be 0 or more'),
@@ -702,6 +711,106 @@ function GoalkeeperTab() {
   )
 }
 
+function birthdayMessagesFromSettings(settings: AppSetting[]): BirthdayMessages {
+  const get = (key: string, fallback: string) => settings.find(s => s.key === key)?.value ?? fallback
+  return {
+    push_title: get(BIRTHDAY_PUSH_TITLE_KEY, DEFAULT_BIRTHDAY_MESSAGES.push_title),
+    push_body: get(BIRTHDAY_PUSH_BODY_KEY, DEFAULT_BIRTHDAY_MESSAGES.push_body),
+    sms_message: get(BIRTHDAY_SMS_KEY, DEFAULT_BIRTHDAY_MESSAGES.sms_message),
+  }
+}
+
+// ─── Birthday messages settings ───────────────────────────────────────────────
+
+const birthdayMessagesSchema = z.object({
+  push_title: z.string().min(1, 'Push title is required'),
+  push_body: z.string().min(1, 'Push body is required'),
+  sms_message: z.string().min(1, 'SMS message is required'),
+})
+type BirthdayMessagesFormValues = z.infer<typeof birthdayMessagesSchema>
+
+function BirthdayMessagesTab() {
+  const qc = useQueryClient()
+  const { toast } = useToast()
+
+  const { data: settings = [], isLoading } = useQuery({
+    queryKey: ['admin-settings'],
+    queryFn: async () => (await api.get<ApiResponse<AppSetting[]>>('/admin/settings')).data.data,
+  })
+
+  const current = birthdayMessagesFromSettings(settings)
+
+  const form = useForm<BirthdayMessagesFormValues>({
+    resolver: zodResolver(birthdayMessagesSchema),
+    values: current,
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: (payload: BirthdayMessagesPayload) =>
+      api.put<ApiResponse<BirthdayMessages>>('/admin/settings/birthday-messages', payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-settings'] })
+      toast({ title: 'Birthday messages updated', variant: 'success' as never })
+    },
+    onError: () => toast({ title: 'Failed to update birthday messages', variant: 'destructive' }),
+  })
+
+  function onSubmit(v: BirthdayMessagesFormValues) {
+    updateMutation.mutate(v)
+  }
+
+  return (
+    <Card className="max-w-2xl">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Cake className="w-4 h-4" />
+          Birthday Greetings
+        </CardTitle>
+        <CardDescription>
+          Templates for the daily birthday worker (runs at <strong>08:00 Asia/Amman</strong>). Users whose
+          date of birth matches today receive a push notification and SMS (when a phone is on file).
+          Use <code className="text-xs bg-muted px-1 py-0.5 rounded">{'{name}'}</code> for the player&apos;s first name.
+          Each user is greeted at most once per calendar year.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Skeleton className="h-40 w-full" />
+        ) : (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField control={form.control} name="push_title" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Push notification title</FormLabel>
+                  <FormControl><Input dir="rtl" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="push_body" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Push notification body</FormLabel>
+                  <FormControl><Textarea rows={3} dir="rtl" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="sms_message" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>SMS message</FormLabel>
+                  <FormControl><Textarea rows={3} dir="rtl" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <Button type="submit" disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? 'Saving…' : 'Save Messages'}
+              </Button>
+            </form>
+          </Form>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 function ComingSoonTab({ label }: { label: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground gap-3">
@@ -723,7 +832,7 @@ export default function SettingsPage() {
           <TabsTrigger value="deposit">Deposit Instructions</TabsTrigger>
           <TabsTrigger value="registration">Registration Instructions</TabsTrigger>
           <TabsTrigger value="goalkeeper">Goalkeeper</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="notifications">Birthday</TabsTrigger>
           <TabsTrigger value="app">App Config</TabsTrigger>
         </TabsList>
         <TabsContent value="policies"><PoliciesTab /></TabsContent>
@@ -731,7 +840,7 @@ export default function SettingsPage() {
         <TabsContent value="deposit"><DepositInstructionsTab /></TabsContent>
         <TabsContent value="registration"><RegistrationInstructionsTab /></TabsContent>
         <TabsContent value="goalkeeper"><GoalkeeperTab /></TabsContent>
-        <TabsContent value="notifications"><ComingSoonTab label="Notification" /></TabsContent>
+        <TabsContent value="notifications"><BirthdayMessagesTab /></TabsContent>
         <TabsContent value="app"><ComingSoonTab label="App" /></TabsContent>
       </Tabs>
     </div>
