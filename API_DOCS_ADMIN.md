@@ -1,9 +1,15 @@
 # Yalla Plei — Admin API Documentation
 
 > **Base URL**: `https://api.yallaplei.com/api/v1`  
-> **Version**: 3.14.0  
+> **Version**: 3.16.0  
 > **Audience**: Admin panel / back-office (role = `admin` or `manager`)  
-> **Last Updated**: 2026-06-28
+> **Last Updated**: 2026-07-04
+
+### What's New in 3.16.0
+- **Goalkeeper participation**: players can join a match as goalkeeper (`participate_as_goalkeeper` on booking/reserve). Configure the discount via `PUT /admin/settings/goalkeeper-discount` (default **50%** off the join price after level discount). Max **2** goalkeepers per match. New loyalty point rule `goalkeeper_participation` (seeded on startup). Bookings expose `is_goalkeeper`; player stats include `goalkeeper_matches`.
+
+### What's New in 3.15.0
+- **New-match push broadcast**: creating a match (`POST /admin/matches` or `POST /admin/match-templates/:id/create-match`) now automatically sends a push notification to every player subscribed to the `new_matches` channel. No extra fields are required. Players manage their device tokens and channel subscriptions from the Player API (`POST/DELETE /users/devices`, `GET/POST /users/notifications/...`).
 
 ### What's New in 3.14.0
 - **Rental pitch coordinates**: rentable pitches now accept `latitude` / `longitude` on create & update. Players can then **sort the pitch list by distance** from their location (in addition to rating and price) — see the Player API. Coordinates are optional.
@@ -609,7 +615,7 @@ Returns a single match. Bypasses the active-only filter (can retrieve cancelled 
 
 ### `POST /api/v1/admin/matches`
 **Auth**: admin or manager  
-Schedules a new match.
+Schedules a new match. On success, a push notification is broadcast to all players subscribed to the `new_matches` channel.
 
 **Request Body**:
 ```json
@@ -935,7 +941,8 @@ Returns all scoring rules (the defaults are seeded automatically on startup).
     { "key": "mvp",               "name_ar": "رجل المباراة",        "name_en": "Man of the match",         "points": 20,  "subscriber_points": 30, "is_enabled": true, "updated_at": "..." },
     { "key": "rating_multiplier", "name_ar": "نقاط لكل درجة تقييم", "name_en": "Points per rating point",  "points": 1,   "subscriber_points": 2,  "is_enabled": true, "updated_at": "..." },
     { "key": "yellow_card",       "name_ar": "بطاقة صفراء",         "name_en": "Yellow card",              "points": -5,  "subscriber_points": -5, "is_enabled": true, "updated_at": "..." },
-    { "key": "red_card",          "name_ar": "بطاقة حمراء",         "name_en": "Red card",                 "points": -10, "subscriber_points": -10,"is_enabled": true, "updated_at": "..." }
+    { "key": "red_card",          "name_ar": "بطاقة حمراء",         "name_en": "Red card",                 "points": -10, "subscriber_points": -10,"is_enabled": true, "updated_at": "..." },
+    { "key": "goalkeeper_participation", "name_ar": "المشاركة كحارس", "name_en": "Goalkeeper participation", "points": 5, "subscriber_points": 8, "is_enabled": true, "updated_at": "..." }
   ]
 }
 ```
@@ -944,6 +951,7 @@ Returns all scoring rules (the defaults are seeded automatically on startup).
 |----------|--------------|
 | `booking_paid` | The booking is confirmed (payment completed) |
 | `attendance` | The referee/admin marks the player as attended |
+| `goalkeeper_participation` | The player attended the match **as goalkeeper** (`is_goalkeeper` + `attended`) |
 | `goal` / `assist` | Per goal / per assist recorded |
 | `mvp` | The player is named man of the match |
 | `rating_multiplier` | Per 1.0 of the referee's rating (e.g. value `2` × rating `7.5` → 15 points, rounded) |
@@ -1280,10 +1288,37 @@ Returns all settings. Known keys missing from the table are returned with their 
   "success": true,
   "data": [
     { "key": "waitlist_offer_duration_minutes", "value": "30", "updated_at": "2026-06-07T10:00:00Z" },
-    { "key": "deposit_instructions", "value": "Transfer to Bank ABC, IBAN JO00...", "updated_at": "2026-06-07T10:00:00Z" }
+    { "key": "deposit_instructions", "value": "Transfer to Bank ABC, IBAN JO00...", "updated_at": "2026-06-07T10:00:00Z" },
+    { "key": "goalkeeper_discount_percent", "value": "50", "updated_at": "2026-07-04T10:00:00Z" }
   ]
 }
 ```
+
+---
+
+### `PUT /api/v1/admin/settings/goalkeeper-discount`
+**Auth**: admin or manager  
+Sets the percentage discount applied to the join price when a player participates as
+goalkeeper. The discount applies **after** any level discount on the match join price.
+
+**Request Body**:
+```json
+{ "percent": 50 }
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `percent` | int | ✅ | Discount percentage `0`–`100`. Default is `50` |
+
+**Response** `200`:
+```json
+{
+  "success": true,
+  "data": { "key": "goalkeeper_discount_percent", "value": 50 }
+}
+```
+
+**Error** `400`: `percent must be between 0 and 100`
 
 ---
 

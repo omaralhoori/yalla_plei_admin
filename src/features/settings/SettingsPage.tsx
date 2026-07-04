@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, Construction, Hourglass, Landmark, Clock, MessageSquareText } from 'lucide-react'
+import { Plus, Pencil, Trash2, Construction, Hourglass, Landmark, Clock, MessageSquareText, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -20,11 +20,13 @@ import PageHeader from '@/components/shared/PageHeader'
 import ConfirmDialog from '@/components/shared/ConfirmDialog'
 import { useToast } from '@/hooks/use-toast'
 import { api } from '@/lib/api'
-import type { ApiResponse, CancellationPolicy, PolicyPayload, AppSetting } from '@/types/api'
+import type { ApiResponse, CancellationPolicy, PolicyPayload, AppSetting, PointRule, PointRulePayload } from '@/types/api'
 
 const WAITLIST_OFFER_KEY = 'waitlist_offer_duration_minutes'
 const DEPOSIT_INSTRUCTIONS_KEY = 'deposit_instructions'
 const REGISTRATION_INSTRUCTIONS_KEY = 'registration_instructions'
+const GOALKEEPER_DISCOUNT_KEY = 'goalkeeper_discount_percent'
+const GOALKEEPER_POINT_RULE_KEY = 'goalkeeper_participation'
 
 const refundTierSchema = z.object({
   hours_before: z.coerce.number().int('Whole number').min(0, 'Must be 0 or more'),
@@ -525,6 +527,181 @@ function RegistrationInstructionsTab() {
   )
 }
 
+// ─── Goalkeeper settings ──────────────────────────────────────────────────────
+
+const goalkeeperDiscountSchema = z.object({
+  percent: z.coerce.number().int('Must be a whole number').min(0, 'Min 0').max(100, 'Max 100'),
+})
+type GoalkeeperDiscountFormValues = z.infer<typeof goalkeeperDiscountSchema>
+
+const goalkeeperPointsSchema = z.object({
+  points: z.coerce.number().int().refine(v => v !== 0, { message: 'Points cannot be zero' }),
+  subscriber_points: z.coerce.number().int(),
+  is_enabled: z.boolean(),
+})
+type GoalkeeperPointsFormValues = z.infer<typeof goalkeeperPointsSchema>
+
+function GoalkeeperTab() {
+  const qc = useQueryClient()
+  const { toast } = useToast()
+
+  const { data: settings = [], isLoading: settingsLoading } = useQuery({
+    queryKey: ['admin-settings'],
+    queryFn: async () => (await api.get<ApiResponse<AppSetting[]>>('/admin/settings')).data.data,
+  })
+
+  const { data: pointRules = [], isLoading: rulesLoading } = useQuery({
+    queryKey: ['point-rules'],
+    queryFn: async () => (await api.get<ApiResponse<PointRule[]>>('/admin/point-rules')).data.data,
+  })
+
+  const currentDiscount = settings.find(s => s.key === GOALKEEPER_DISCOUNT_KEY)
+  const currentPercent = currentDiscount ? Number(currentDiscount.value) : 50
+
+  const goalkeeperRule = pointRules.find(r => r.key === GOALKEEPER_POINT_RULE_KEY)
+
+  const discountForm = useForm<GoalkeeperDiscountFormValues>({
+    resolver: zodResolver(goalkeeperDiscountSchema),
+    values: { percent: currentPercent },
+  })
+
+  const pointsForm = useForm<GoalkeeperPointsFormValues>({
+    resolver: zodResolver(goalkeeperPointsSchema),
+    values: goalkeeperRule
+      ? { points: goalkeeperRule.points, subscriber_points: goalkeeperRule.subscriber_points ?? 0, is_enabled: goalkeeperRule.is_enabled }
+      : undefined,
+    defaultValues: { points: 5, subscriber_points: 8, is_enabled: true },
+  })
+
+  const discountMutation = useMutation({
+    mutationFn: (payload: { percent: number }) => api.put('/admin/settings/goalkeeper-discount', payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-settings'] })
+      toast({ title: 'Goalkeeper discount updated', variant: 'success' as never })
+    },
+    onError: () => toast({ title: 'Failed to update discount', variant: 'destructive' }),
+  })
+
+  const pointsMutation = useMutation({
+    mutationFn: (payload: PointRulePayload) => api.put(`/admin/point-rules/${GOALKEEPER_POINT_RULE_KEY}`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['point-rules'] })
+      toast({ title: 'Goalkeeper points rule updated', variant: 'success' as never })
+    },
+    onError: () => toast({ title: 'Failed to update points rule', variant: 'destructive' }),
+  })
+
+  function onDiscountSubmit(v: GoalkeeperDiscountFormValues) {
+    discountMutation.mutate({ percent: v.percent })
+  }
+
+  function onPointsSubmit(v: GoalkeeperPointsFormValues) {
+    pointsMutation.mutate(v)
+  }
+
+  const isLoading = settingsLoading || rulesLoading
+
+  return (
+    <div className="space-y-6 max-w-xl">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Shield className="w-4 h-4" />
+            Goalkeeper Join Discount
+          </CardTitle>
+          <CardDescription>
+            Percentage off the match join price when a player registers as goalkeeper. Applied after any
+            level discount. Max 2 goalkeepers per match.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-10 w-full max-w-xs" />
+          ) : (
+            <Form {...discountForm}>
+              <form onSubmit={discountForm.handleSubmit(onDiscountSubmit)} className="space-y-4">
+                <FormField control={discountForm.control} name="percent" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Discount (%)</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center gap-3">
+                        <Input type="number" min="0" max="100" step="1" className="max-w-[140px]" {...field} />
+                        <span className="text-sm text-muted-foreground">%</span>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <div className="flex items-center gap-3">
+                  <Button type="submit" disabled={discountMutation.isPending}>
+                    {discountMutation.isPending ? 'Saving…' : 'Save Discount'}
+                  </Button>
+                  <Label className="text-xs text-muted-foreground font-normal">
+                    Current: {currentPercent}%
+                  </Label>
+                </div>
+              </form>
+            </Form>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Goalkeeper Participation Points</CardTitle>
+          <CardDescription>
+            Loyalty points awarded when a player attends a match as goalkeeper
+            (<code className="text-xs bg-muted px-1 py-0.5 rounded">{GOALKEEPER_POINT_RULE_KEY}</code>).
+            Also editable under Loyalty → Point Rules.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <Skeleton className="h-28 w-full" />
+          ) : !goalkeeperRule ? (
+            <p className="text-sm text-muted-foreground">Point rule not found — it should be seeded on server startup.</p>
+          ) : (
+            <Form {...pointsForm}>
+              <form onSubmit={pointsForm.handleSubmit(onPointsSubmit)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField control={pointsForm.control} name="points" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Points (normal)</FormLabel>
+                      <FormControl><Input type="number" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={pointsForm.control} name="subscriber_points" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Points (subscriber)</FormLabel>
+                      <FormControl><Input type="number" {...field} placeholder="0 = same as normal" /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+                <FormField control={pointsForm.control} name="is_enabled" render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                    <div>
+                      <FormLabel className="text-sm font-medium">Enabled</FormLabel>
+                      <p className="text-xs text-muted-foreground">Disabled rules contribute 0 points</p>
+                    </div>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                  </FormItem>
+                )} />
+                <Button type="submit" disabled={pointsMutation.isPending}>
+                  {pointsMutation.isPending ? 'Saving…' : 'Save Points Rule'}
+                </Button>
+              </form>
+            </Form>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 function ComingSoonTab({ label }: { label: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground gap-3">
@@ -545,6 +722,7 @@ export default function SettingsPage() {
           <TabsTrigger value="waitlist">Waitlist</TabsTrigger>
           <TabsTrigger value="deposit">Deposit Instructions</TabsTrigger>
           <TabsTrigger value="registration">Registration Instructions</TabsTrigger>
+          <TabsTrigger value="goalkeeper">Goalkeeper</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="app">App Config</TabsTrigger>
         </TabsList>
@@ -552,6 +730,7 @@ export default function SettingsPage() {
         <TabsContent value="waitlist"><WaitlistTab /></TabsContent>
         <TabsContent value="deposit"><DepositInstructionsTab /></TabsContent>
         <TabsContent value="registration"><RegistrationInstructionsTab /></TabsContent>
+        <TabsContent value="goalkeeper"><GoalkeeperTab /></TabsContent>
         <TabsContent value="notifications"><ComingSoonTab label="Notification" /></TabsContent>
         <TabsContent value="app"><ComingSoonTab label="App" /></TabsContent>
       </Tabs>
