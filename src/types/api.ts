@@ -562,6 +562,27 @@ export interface MonthlyLeaderboardEntry {
   user?: { id: string; first_name: string; last_name: string; email?: string; phone?: string }
 }
 
+// ─── Visit Analytics ──────────────────────────────────────────────────────────
+
+export interface VisitorAnalyticsSummary {
+  total_unique_visitors: number
+  total_visits: number
+  new_visitors_today: number
+  visits_today: number
+}
+
+export interface VisitVisitor {
+  id: string
+  ip_address: string
+  user_id?: string | null
+  visit_count: number
+  platform?: string
+  user_agent?: string
+  first_visit_at: string
+  last_visit_at: string
+  user?: { id: string; first_name: string; last_name: string }
+}
+
 // ─── Audit Log ────────────────────────────────────────────────────────────────
 
 export type AuditAction = 'create' | 'update' | 'delete'

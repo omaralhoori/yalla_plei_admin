@@ -2,12 +2,13 @@ import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   LayoutDashboard, Dumbbell, Users, MapPin, Wrench,
-  Calendar, CalendarCog, CreditCard, Receipt, Settings, Trophy, Gift, BookOpen, Film, Globe, History, KeyRound, Crown, Megaphone,
+  Calendar, CalendarCog, CreditCard, Receipt, Settings, Trophy, Gift, BookOpen, Film, Globe, History, KeyRound, Crown, Megaphone, BarChart3,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
+  { to: '/visit-analytics', icon: BarChart3, labelKey: 'nav.visitAnalytics' },
   { to: '/users', icon: Users, labelKey: 'nav.users' },
   { to: '/sports', icon: Dumbbell, labelKey: 'nav.sports' },
   { to: '/teams', icon: Trophy, labelKey: 'nav.teams' },

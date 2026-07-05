@@ -1,9 +1,12 @@
 # Yalla Plei — Admin API Documentation
 
 > **Base URL**: `https://api.yallaplei.com/api/v1`  
-> **Version**: 3.20.0  
+> **Version**: 3.21.0  
 > **Audience**: Admin panel / back-office (role = `admin` or `manager`)  
 > **Last Updated**: 2026-07-05
+
+### What's New in 3.21.0
+- **Home visit analytics**: see who opened the app / home screen — unique visitors by IP, visit counts, and daily summary. `GET /admin/analytics/visitors/summary` and `GET /admin/analytics/visitors`. See **Visit Analytics (Admin)**.
 
 ### What's New in 3.20.0
 - **Dual scoring (monthly + XP)**: monthly point rules (`/admin/point-rules`) now feed **monthly competitive points** only; new **XP rules** (`GET/PUT /admin/xp-rules/:key`) drive levels/cards permanently with no subscriber boost. Admin manual adjustments apply to **XP**. Archived monthly leaderboards at `GET /admin/leaderboards/monthly/archives`. See **Points System** and **XP System**.
@@ -1601,6 +1604,73 @@ Rejects a `pending` receipt. Nothing is credited to the wallet.
 
 ### `DELETE /api/v1/admin/highlights/:id`
 **Response** `200`: `{ "message": "highlight deleted" }`
+
+---
+
+## Visit Analytics (Admin)
+
+Tracks app / home-screen opens reported by clients via `POST /analytics/home-visit`. Each unique **IP address** is a visitor; every call increments that visitor's `visit_count` and appends a visit event.
+
+### `GET /api/v1/admin/analytics/visitors/summary`
+**Auth**: admin or manager
+
+**Response** `200`:
+```json
+{
+  "success": true,
+  "data": {
+    "total_unique_visitors": 1250,
+    "total_visits": 8430,
+    "new_visitors_today": 42,
+    "visits_today": 318
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `total_unique_visitors` | Distinct IP addresses seen |
+| `total_visits` | Total home-visit events (all time) |
+| `new_visitors_today` | First-time IPs today (Asia/Amman) |
+| `visits_today` | Home-visit events today |
+
+---
+
+### `GET /api/v1/admin/analytics/visitors`
+**Auth**: admin or manager
+
+**Query Params**:
+| Param | Description |
+|-------|-------------|
+| `from` | `YYYY-MM-DD` — last visit on or after |
+| `to` | `YYYY-MM-DD` — last visit on or before |
+| `limit` | Default 20 |
+| `offset` | Pagination |
+
+**Response** `200**: paginated list of visitors:
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": "uuid",
+        "ip_address": "203.0.113.10",
+        "user_id": "uuid",
+        "visit_count": 12,
+        "platform": "android",
+        "user_agent": "YallaPlei/1.0",
+        "first_visit_at": "2026-06-01T10:00:00Z",
+        "last_visit_at": "2026-07-05T09:15:00Z",
+        "user": { "id": "uuid", "first_name": "Omar", "last_name": "Ali" }
+      }
+    ],
+    "meta": { "total_count": 1250, "current_page": 1, "limit": 20, "has_next": true }
+  }
+}
+```
+
+`user` is populated when the visitor was logged in on their most recent tracked visit.
 
 ---
 
