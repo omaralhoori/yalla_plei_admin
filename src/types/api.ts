@@ -302,7 +302,10 @@ export interface AdminUser {
 export interface PlayerProfile {
   id: string
   sport_id: string
-  total_points: number
+  total_xp: number
+  monthly_points: number
+  /** @deprecated use total_xp */
+  total_points?: number
   preferred_position?: string
   preferred_foot?: string
   shirt_number?: number
@@ -316,7 +319,8 @@ export interface PlayerProfile {
 export interface AdminUserDetail {
   user: AdminUser
   player_profiles: PlayerProfile[]
-  total_points: number
+  /** @deprecated prefer per-profile total_xp */
+  total_points?: number
   wallet_balance?: number
   stats: {
     total_goals: number
@@ -339,6 +343,7 @@ export interface CreateAdminUserPayload {
 export interface AdjustPointsPayload {
   points: number
   description: string
+  sport_id: string
 }
 
 // ─── Level ────────────────────────────────────────────────────────────────────
@@ -523,6 +528,38 @@ export interface PointRulePayload {
   is_enabled?: boolean
   name_ar?: string
   name_en?: string
+}
+
+// ─── XP Rule ──────────────────────────────────────────────────────────────────
+
+export interface XpRule {
+  key: string
+  name_ar: string
+  name_en: string
+  points: number
+  is_enabled: boolean
+  updated_at?: string
+}
+
+export interface XpRulePayload {
+  points?: number
+  is_enabled?: boolean
+  name_ar?: string
+  name_en?: string
+}
+
+// ─── Monthly Leaderboard Archives ─────────────────────────────────────────────
+
+export interface MonthlyLeaderboardEntry {
+  rank: number
+  user_id: string
+  monthly_points: number
+  total_goals?: number
+  total_assists?: number
+  total_mvps?: number
+  total_matches?: number
+  breakdown_json?: Record<string, number> | string
+  user?: { id: string; first_name: string; last_name: string; email?: string; phone?: string }
 }
 
 // ─── Audit Log ────────────────────────────────────────────────────────────────

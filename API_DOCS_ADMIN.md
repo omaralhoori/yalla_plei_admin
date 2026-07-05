@@ -1,9 +1,12 @@
 # Yalla Plei — Admin API Documentation
 
 > **Base URL**: `https://api.yallaplei.com/api/v1`  
-> **Version**: 3.19.0  
+> **Version**: 3.20.0  
 > **Audience**: Admin panel / back-office (role = `admin` or `manager`)  
-> **Last Updated**: 2026-07-04
+> **Last Updated**: 2026-07-05
+
+### What's New in 3.20.0
+- **Dual scoring (monthly + XP)**: monthly point rules (`/admin/point-rules`) now feed **monthly competitive points** only; new **XP rules** (`GET/PUT /admin/xp-rules/:key`) drive levels/cards permanently with no subscriber boost. Admin manual adjustments apply to **XP**. Archived monthly leaderboards at `GET /admin/leaderboards/monthly/archives`. See **Points System** and **XP System**.
 
 ### What's New in 3.19.0
 - **Promo items (offers / announcements / ads)**: full CRUD at `/admin/promo-items`. Define bilingual content (image, title, short & long descriptions), choose a type (`offer`, `announcement`, `ad`), set sort order, active flag, and optional schedule window. Active items appear to players via `GET /promo-items`. See **Promo Items Management (Admin)**.
@@ -120,7 +123,7 @@ Obtain a Custom JWT the same way players do:
 | **PolicyRefundTier** | Belongs to Policy. `hours_before` + `refund_percent`: refunds a % of the paid amount based on hours remaining before kickoff |
 | **Level** | Assigned by points range. Perks: `discount_percent` (auto-applied to match join price), `benefits_ar`/`benefits_en`. Player card: `card_type` identifier (e.g. `"gold"`) — the app renders the matching card design |
 | **PointRule** | Admin-tunable scoring rule (`key`, `points`, `is_enabled`). Defines how players earn/lose points |
-| **PlayerProfile** | Belongs to User+Sport+Level. `total_points` and `preferred_position` are per-sport; `total_points` drives the level |
+| **PlayerProfile** | Belongs to User+Sport+Level. `total_xp` drives level/card; `monthly_points` resets each month; `preferred_position` is per-sport |
 | **LoyaltyPoints** | Belongs to User. Append-only points ledger (every earn/deduct/redeem is one row) |
 | **LoyaltyReward** | Standalone |
 | **RewardRedemption** | Belongs to User+Reward |
@@ -897,7 +900,7 @@ Returns full profile including player profiles, total points, wallet balance, an
 ### `PUT /api/v1/admin/users/:id/points`
 **Auth**: admin or manager  
 Manually adjust a player's points for a specific sport. The adjustment is applied
-to the player's per-sport `total_points` (creating the profile if it doesn't exist
+to the player's per-sport **`total_xp`** (creating the profile if it doesn't exist
 yet), the player's level is re-evaluated, and the change is recorded in the loyalty
 points ledger with the sport context.
 
@@ -923,16 +926,43 @@ points ledger with the sport context.
 
 ---
 
-## Points System (Admin)
+## Points System (Admin) — Monthly Points
 
-Player points are **per-sport**: each `player_profiles` row carries its own
-`total_points` and `level_id`. The points engine recalculates a booking's worth
-whenever its state changes (payment confirmed, referee stats submitted, booking
-cancelled) and applies the **difference** to the player's per-sport total — so
-re-submitting stats never double-counts, and cancelling a booking revokes the
-points it had granted. Every change is appended to the loyalty points ledger
-(with `sport_id` for filtering), and the per-sport level is re-evaluated against
-the level ranges (a level-up triggers a push notification).
+Monthly points are **per-sport**, reset each calendar month (Asia/Amman), and used for
+monthly rankings and reward redemption. The engine recalculates whenever a booking changes
+(payment, referee stats, cancellation) and applies the **difference** to `monthly_points`.
+Active subscribers are scored with `subscriber_points`. Every change is logged in
+`loyalty_points` with `category: "monthly"`.
+
+## XP System (Admin) — Permanent Experience
+
+XP is **per-sport**, never resets, and drives **levels and player cards** (`total_xp`).
+Same scoring actions as monthly rules, but configured separately via `xp_rules` with
+**no subscriber boost**. Ledger entries use `category: "xp"`. Admin manual adjustments
+(`PUT /admin/users/:id/points`) apply to XP.
+
+### `GET /api/v1/admin/xp-rules`
+**Auth**: admin or manager
+
+Same shape as point rules but without `subscriber_points`.
+
+### `PUT /api/v1/admin/xp-rules/:key`
+**Auth**: admin or manager
+
+**Request Body**: `{ "points": 10, "is_enabled": true, "name_ar": "...", "name_en": "..." }`
+
+---
+
+### `GET /api/v1/admin/leaderboards/monthly/archives`
+**Auth**: admin or manager
+
+**Query**: `period` (required `YYYY-MM`), `sport_id` (optional), `limit`, `offset`
+
+Returns archived monthly top players with stats and `breakdown_json`.
+
+---
+
+## Points System (Admin) — Monthly Point Rules
 
 ### `GET /api/v1/admin/point-rules`
 **Auth**: admin or manager  
@@ -1001,10 +1031,8 @@ the update; already-awarded points are not retroactively recalculated.
 
 ## Levels Management (Admin)
 
-Levels classify players by their per-sport `total_points`. When a player's
-points cross into another level's range, the level is reassigned automatically
-(up **and** down) and the player's perks change with it: `discount_percent` is
-applied automatically to the match join price when the player books.
+Levels classify players by their per-sport **`total_xp`**. When XP crosses into
+another level's range, the level is reassigned automatically (up **and** down).
 
 ### `GET /api/v1/admin/levels`
 **Auth**: admin or manager

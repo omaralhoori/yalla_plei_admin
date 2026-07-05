@@ -657,11 +657,11 @@ function GoalkeeperTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Goalkeeper Participation Points</CardTitle>
+          <CardTitle className="text-base">Goalkeeper Participation (Monthly)</CardTitle>
           <CardDescription>
-            Loyalty points awarded when a player attends a match as goalkeeper
+            Monthly competitive points awarded when a player attends as goalkeeper
             (<code className="text-xs bg-muted px-1 py-0.5 rounded">{GOALKEEPER_POINT_RULE_KEY}</code>).
-            Also editable under Loyalty → Point Rules.
+            Also editable under Loyalty → Monthly Rules. Permanent XP for goalkeepers is under Loyalty → XP Rules.
           </CardDescription>
         </CardHeader>
         <CardContent>

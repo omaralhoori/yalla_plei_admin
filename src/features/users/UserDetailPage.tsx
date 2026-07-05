@@ -11,19 +11,21 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/hooks/use-toast'
 import { api } from '@/lib/api'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
 import StatusBadge from '@/components/shared/StatusBadge'
 import SideBadge from '@/components/shared/SideBadge'
-import type { ApiResponse, PaginatedResponse, AdminUserDetail, AdjustPointsPayload, AdminBooking } from '@/types/api'
+import type { ApiResponse, PaginatedResponse, AdminUserDetail, AdjustPointsPayload, AdminBooking, Sport } from '@/types/api'
 
 const adjustPointsSchema = z.object({
+  sport_id: z.string().min(1, 'Sport is required'),
   points: z.coerce
     .number()
     .int('Must be a whole number')
-    .refine(v => v !== 0, 'Points cannot be zero'),
+    .refine(v => v !== 0, 'XP cannot be zero'),
   description: z.string().min(5, 'Provide a reason (min 5 characters)'),
 })
 
@@ -60,9 +62,14 @@ export default function UserDetailPage() {
     enabled: !!id,
   })
 
+  const { data: sports = [] } = useQuery({
+    queryKey: ['sports'],
+    queryFn: async () => (await api.get<ApiResponse<Sport[]>>('/sports')).data.data,
+  })
+
   const form = useForm<AdjustPointsValues>({
     resolver: zodResolver(adjustPointsSchema),
-    defaultValues: { points: 0, description: '' },
+    defaultValues: { sport_id: '', points: 0, description: '' },
   })
 
   const adjustMutation = useMutation({
@@ -70,15 +77,19 @@ export default function UserDetailPage() {
       api.put(`/admin/users/${id}/points`, payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['user-detail', id] })
-      toast({ title: 'Points adjusted successfully', variant: 'success' as never })
+      toast({ title: 'XP adjusted successfully', variant: 'success' as never })
       setAdjustOpen(false)
       form.reset()
     },
-    onError: () => toast({ title: 'Failed to adjust points', variant: 'destructive' }),
+    onError: () => toast({ title: 'Failed to adjust XP', variant: 'destructive' }),
   })
 
   const user = data?.user
   const stats = data?.stats
+  const totalXp = data?.player_profiles?.reduce(
+    (sum, p) => sum + (p.total_xp ?? p.total_points ?? 0),
+    0,
+  ) ?? data?.total_points ?? 0
 
   return (
     <div className="space-y-6">
@@ -95,8 +106,12 @@ export default function UserDetailPage() {
           )}
           <p className="text-muted-foreground text-sm">User Profile &amp; Statistics</p>
         </div>
-        <Button variant="outline" onClick={() => setAdjustOpen(true)} disabled={isLoading}>
-          <Target className="w-4 h-4 mr-2" />Adjust Points
+        <Button variant="outline" onClick={() => {
+          const defaultSport = data?.player_profiles?.[0]?.sport_id ?? sports[0]?.id ?? ''
+          form.reset({ sport_id: defaultSport, points: 0, description: '' })
+          setAdjustOpen(true)
+        }} disabled={isLoading}>
+          <Target className="w-4 h-4 mr-2" />Adjust XP
         </Button>
       </div>
 
@@ -148,7 +163,7 @@ export default function UserDetailPage() {
 
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-        <StatCard icon={Trophy} label="Total Points" value={isLoading ? null : String(data?.total_points ?? 0)} color="text-amber-600" bg="bg-amber-50" />
+        <StatCard icon={Trophy} label="Total XP" value={isLoading ? null : String(totalXp)} color="text-violet-600" bg="bg-violet-50" />
         <StatCard icon={Wallet} label="Wallet" value={isLoading ? null : formatCurrency(data?.wallet_balance ?? 0)} color="text-emerald-600" bg="bg-emerald-50" />
         <StatCard icon={Users} label="Matches" value={isLoading ? null : String(stats?.total_matches ?? 0)} color="text-blue-600" bg="bg-blue-50" />
         <StatCard icon={Sword} label="Goals" value={isLoading ? null : String(stats?.total_goals ?? 0)} color="text-violet-600" bg="bg-violet-50" />
@@ -175,8 +190,12 @@ export default function UserDetailPage() {
                   <InfoRow label="Sport" value={profile.sport?.name_en} />
                   <InfoRow label="Level" value={profile.level?.name_en} />
                   <div>
-                    <p className="text-muted-foreground text-xs mb-0.5">Points</p>
-                    <p className="font-semibold text-amber-600">{profile.total_points.toLocaleString()}</p>
+                    <p className="text-muted-foreground text-xs mb-0.5">Total XP</p>
+                    <p className="font-semibold text-violet-600">{(profile.total_xp ?? profile.total_points ?? 0).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground text-xs mb-0.5">Monthly Pts</p>
+                    <p className="font-semibold text-amber-600">{(profile.monthly_points ?? 0).toLocaleString()}</p>
                   </div>
                   <InfoRow label="Position" value={profile.preferred_position} className="capitalize" />
                   <InfoRow label="Preferred Foot" value={profile.preferred_foot} className="capitalize" />
@@ -241,16 +260,30 @@ export default function UserDetailPage() {
       <Dialog open={adjustOpen} onOpenChange={open => { setAdjustOpen(open); if (!open) form.reset() }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Adjust Loyalty Points</DialogTitle>
+            <DialogTitle>Adjust XP</DialogTitle>
             <DialogDescription>
-              Positive values award points; negative values deduct. The change is logged in the user&apos;s history.
+              Manually add or deduct permanent XP for a specific sport. The player&apos;s level is re-evaluated automatically.
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(v => adjustMutation.mutate(v))} className="space-y-4 mt-2">
+              <FormField control={form.control} name="sport_id" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Sport</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue placeholder="Select sport" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {sports.map(s => <SelectItem key={s.id} value={s.id}>{s.name_en}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
               <FormField control={form.control} name="points" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Points (+award / −deduct)</FormLabel>
+                  <FormLabel>XP (+award / −deduct)</FormLabel>
                   <FormControl>
                     <Input type="number" placeholder="e.g. 100 or -50" {...field} />
                   </FormControl>
