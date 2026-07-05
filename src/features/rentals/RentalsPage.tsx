@@ -24,10 +24,10 @@ import ImageUpload from '@/components/shared/ImageUpload'
 import { useToast } from '@/hooks/use-toast'
 import { usePagination } from '@/hooks/usePagination'
 import { api } from '@/lib/api'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import type {
   ApiResponse, PaginatedResponse, Sport, Service, CancellationPolicy, AdminUser,
-  RentalPitch, RentalPitchPayload, RentalPitchAvailability,
+  RentalPitch, RentalPitchPayload, RentalPitchAvailability, RentalPitchServiceItem,
   RentalBooking, BlockSlotPayload, CancelRentalBookingPayload,
 } from '@/types/api'
 
@@ -105,7 +105,7 @@ function RentalPitchesTab() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<RentalPitch | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<RentalPitch | null>(null)
-  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
+  const [selectedServices, setSelectedServices] = useState<RentalPitchServiceItem[]>([])
   const [schedule, setSchedule] = useState<DaySchedule[]>(DEFAULT_SCHEDULE)
 
   const [search, setSearch] = useState('')
@@ -161,7 +161,10 @@ function RentalPitchesTab() {
       longitude: values.longitude ?? null,
       manager_id: values.manager_id || null,
       cancellation_policy_id: values.cancellation_policy_id || null,
-      service_ids: selectedServiceIds,
+      services: selectedServices.map(s => ({
+        service_id: s.service_id,
+        is_strikethrough: s.is_strikethrough ?? false,
+      })),
       availabilities,
     }
   }
@@ -186,7 +189,7 @@ function RentalPitchesTab() {
 
   function openCreate() {
     setEditTarget(null)
-    setSelectedServiceIds([])
+    setSelectedServices([])
     setSchedule(DEFAULT_SCHEDULE.map(d => ({ ...d })))
     form.reset(DEFAULT_PITCH_VALUES)
     setSheetOpen(true)
@@ -194,7 +197,12 @@ function RentalPitchesTab() {
 
   function openEdit(p: RentalPitch) {
     setEditTarget(p)
-    setSelectedServiceIds(p.services?.map(s => s.id) ?? [])
+    setSelectedServices(
+      (p.services ?? []).map(s => ({
+        service_id: s.id,
+        is_strikethrough: s.is_strikethrough ?? false,
+      })),
+    )
     const next = DEFAULT_SCHEDULE.map(d => ({ ...d }))
     ;(p.availabilities ?? []).forEach(a => {
       if (a.day_of_week >= 0 && a.day_of_week <= 6) {
@@ -221,7 +229,25 @@ function RentalPitchesTab() {
   }
 
   function toggleService(id: string) {
-    setSelectedServiceIds(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id])
+    setSelectedServices(prev => {
+      const exists = prev.find(s => s.service_id === id)
+      if (exists) return prev.filter(s => s.service_id !== id)
+      return [...prev, { service_id: id, is_strikethrough: false }]
+    })
+  }
+
+  function toggleStrikethrough(id: string) {
+    setSelectedServices(prev => prev.map(s =>
+      s.service_id === id ? { ...s, is_strikethrough: !s.is_strikethrough } : s,
+    ))
+  }
+
+  function isServiceSelected(id: string) {
+    return selectedServices.some(s => s.service_id === id)
+  }
+
+  function isServiceStrikethrough(id: string) {
+    return selectedServices.find(s => s.service_id === id)?.is_strikethrough ?? false
   }
 
   function updateDay(index: number, patch: Partial<DaySchedule>) {
@@ -504,13 +530,38 @@ function RentalPitchesTab() {
               {services.length > 0 && (
                 <div className="space-y-2">
                   <Label>Facilities</Label>
-                  <div className="grid grid-cols-2 gap-2 p-3 border rounded-lg">
-                    {services.map(svc => (
-                      <div key={svc.id} className="flex items-center gap-2">
-                        <Checkbox id={`svc-${svc.id}`} checked={selectedServiceIds.includes(svc.id)} onCheckedChange={() => toggleService(svc.id)} />
-                        <label htmlFor={`svc-${svc.id}`} className="text-sm cursor-pointer">{svc.name_en}</label>
-                      </div>
-                    ))}
+                  <p className="text-xs text-muted-foreground">
+                    Mark a facility as crossed out when it is temporarily unavailable — players will see it struck through.
+                  </p>
+                  <div className="grid grid-cols-1 gap-2 p-3 border rounded-lg">
+                    {services.map(svc => {
+                      const attached = isServiceSelected(svc.id)
+                      const crossed = isServiceStrikethrough(svc.id)
+                      return (
+                        <div key={svc.id} className="flex items-center gap-3">
+                          <Checkbox
+                            id={`svc-${svc.id}`}
+                            checked={attached}
+                            onCheckedChange={() => toggleService(svc.id)}
+                          />
+                          <label
+                            htmlFor={`svc-${svc.id}`}
+                            className={cn(
+                              'text-sm cursor-pointer flex-1 min-w-0',
+                              crossed && 'line-through text-muted-foreground',
+                            )}
+                          >
+                            {svc.name_en}
+                          </label>
+                          {attached && (
+                            <label className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0 cursor-pointer">
+                              <Switch checked={crossed} onCheckedChange={() => toggleStrikethrough(svc.id)} />
+                              Cross out
+                            </label>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}

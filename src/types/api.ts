@@ -95,6 +95,16 @@ export interface ServicePayload {
   type: ServiceType
 }
 
+/** Service attached to a rental pitch (includes strikethrough display flag). */
+export interface RentalPitchService extends Service {
+  is_strikethrough?: boolean
+}
+
+export interface RentalPitchServiceItem {
+  service_id: string
+  is_strikethrough?: boolean
+}
+
 // ─── Pitch ───────────────────────────────────────────────────────────────────
 
 export interface Pitch {
@@ -730,7 +740,7 @@ export interface RentalPitch {
   rating?: number
   booking_count?: number
   sport?: Sport
-  services?: Service[]
+  services?: RentalPitchService[]
   availabilities?: RentalPitchAvailability[]
   cancellation_policy?: CancellationPolicy
   manager?: { id: string; first_name: string; last_name: string; email?: string; phone?: string }
@@ -756,6 +766,8 @@ export interface RentalPitchPayload {
   is_active: boolean
   manager_id?: string | null
   cancellation_policy_id?: string | null
+  services?: RentalPitchServiceItem[]
+  /** @deprecated use services */
   service_ids?: string[]
   availabilities?: RentalPitchAvailability[]
 }

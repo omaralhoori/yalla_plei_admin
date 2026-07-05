@@ -1,9 +1,12 @@
 # Yalla Plei — Admin API Documentation
 
 > **Base URL**: `https://api.yallaplei.com/api/v1`  
-> **Version**: 3.22.0  
+> **Version**: 3.23.0  
 > **Audience**: Admin panel / back-office (role = `admin` or `manager`)  
 > **Last Updated**: 2026-07-05
+
+### What's New in 3.23.0
+- **Rental pitch services — strikethrough**: when attaching facilities/features to a rentable pitch, each entry can be marked `is_strikethrough: true` so players see it crossed out (e.g. temporarily unavailable). Use the `services` array on create/update/`PUT /admin/rental-pitches/:id/services`. See **Pitch Rental (Admin)**.
 
 ### What's New in 3.22.0
 - **User management (edit / role / password)**: update any user's profile (`PUT /admin/users/:id`), change their role (`PUT /admin/users/:id/role`), or set a new password (`PUT /admin/users/:id/password`). Managers cannot assign or modify `admin` accounts. See **User Management (Admin)**.
@@ -2052,7 +2055,10 @@ pitches open that weekday).
   "is_active": true,
   "manager_id": "uuid-or-null",
   "cancellation_policy_id": "uuid-or-null",
-  "service_ids": ["uuid", "uuid"],
+  "services": [
+    { "service_id": "uuid", "is_strikethrough": false },
+    { "service_id": "uuid", "is_strikethrough": true }
+  ],
   "availabilities": [
     { "day_of_week": 1, "open_time": "16:30", "close_time": "23:00" },
     { "day_of_week": 5, "open_time": "10:00", "close_time": "23:00" }
@@ -2072,25 +2078,39 @@ pitches open that weekday).
 | `is_active` | ❌ | Default `true`. Inactive pitches are hidden from players and can't be booked |
 | `manager_id` | ❌ | User id (role `pitch_manager`) who manages this pitch. `null` = unmanaged. See **Pitch Managers** |
 | `cancellation_policy_id` | ❌ | Falls back to the default policy when null |
-| `service_ids` | ❌ | Facilities (the existing services) attached to the pitch |
+| `services` | ❌ | Facilities/features attached to the pitch. Each item: `service_id` (UUID) + `is_strikethrough` (bool, default `false`). When `true`, players see the amenity crossed out |
+| `service_ids` | ❌ | **Deprecated** — shorthand list of UUIDs (all `is_strikethrough: false`). Prefer `services` |
 | `availabilities` | ❌ | Per-weekday windows; `day_of_week` `0=Sun…6=Sat`, times `HH:MM`. A missing weekday is closed |
 
 **Response** `201`: the created pitch.
 
 ### `PUT /api/v1/admin/rental-pitches/:id`
 **Auth**: admin or manager — same body as create. Include `availabilities` to **replace**
-the whole schedule, and `service_ids` to **replace** the services. Omit either key to leave
-it unchanged. `manager_id` is overwritten by the value sent — send the id to assign a pitch
+the whole schedule, and `services` to **replace** the services (with strikethrough flags).
+Omit either key to leave it unchanged. `manager_id` is overwritten by the value sent — send the id to assign a pitch
 manager, or `null` to unassign.
 
 ### `DELETE /api/v1/admin/rental-pitches/:id`
 **Auth**: admin or manager.
 
 ### `PUT /api/v1/admin/rental-pitches/:id/services`
-**Auth**: admin or manager — replace the pitch's services.
+**Auth**: admin or manager — replace the pitch's services and their strikethrough state.
+
 ```json
-{ "service_ids": ["uuid", "uuid"] }
+{
+  "services": [
+    { "service_id": "uuid", "is_strikethrough": false },
+    { "service_id": "uuid", "is_strikethrough": true }
+  ]
+}
 ```
+
+| Field | Description |
+|-------|-------------|
+| `service_id` | UUID of an existing service (`facility` or `feature`) |
+| `is_strikethrough` | When `true`, the mobile app should render the amenity **crossed out** for players |
+
+**Response** `200`: updated pitch with `services` populated (each item includes service fields + `is_strikethrough`).
 
 ### `POST /api/v1/admin/rental-pitches/:id/block`
 **Auth**: admin or manager
