@@ -1,9 +1,12 @@
 # Yalla Plei — Admin API Documentation
 
 > **Base URL**: `https://api.yallaplei.com/api/v1`  
-> **Version**: 3.21.0  
+> **Version**: 3.22.0  
 > **Audience**: Admin panel / back-office (role = `admin` or `manager`)  
 > **Last Updated**: 2026-07-05
+
+### What's New in 3.22.0
+- **User management (edit / role / password)**: update any user's profile (`PUT /admin/users/:id`), change their role (`PUT /admin/users/:id/role`), or set a new password (`PUT /admin/users/:id/password`). Managers cannot assign or modify `admin` accounts. See **User Management (Admin)**.
 
 ### What's New in 3.21.0
 - **Home visit analytics**: see who opened the app / home screen — unique visitors by IP, visit counts, and daily summary. `GET /admin/analytics/visitors/summary` and `GET /admin/analytics/visitors`. See **Visit Analytics (Admin)**.
@@ -897,6 +900,105 @@ on `PUT /admin/rental-pitches/:id` — see **Pitch Managers**.
 ### `GET /api/v1/admin/users/:id`
 **Auth**: admin or manager  
 Returns full profile including player profiles, total points, wallet balance, and match stats.
+
+---
+
+### `PUT /api/v1/admin/users/:id`
+**Auth**: admin or manager  
+Updates a user's personal profile. Unlike the player self-service flow, the admin can change **email** directly (no OTP) and toggle verification flags.
+
+**Request Body** (all fields optional — omitted or empty fields are left unchanged):
+
+```json
+{
+  "name": "Omar Alhori",
+  "first_name": "Omar",
+  "last_name": "Alhori",
+  "gender": "male",
+  "email": "omar@example.com",
+  "phone": "+962501234567",
+  "emergency_phone": "+962509876543",
+  "date_of_birth": "1990-03-22",
+  "country_id": "uuid",
+  "city_id": "uuid",
+  "is_phone_verified": true,
+  "is_email_verified": true
+}
+```
+
+| Field | Notes |
+|-------|-------|
+| `date_of_birth` | `YYYY-MM-DD` |
+| `country_id` / `city_id` | City must belong to the selected country |
+| `is_phone_verified` / `is_email_verified` | Admin can force-verify contact details |
+
+**Response** `200`: updated user object (same shape as a single user in the list).
+
+**Error** `404`: user not found  
+**Error** `409`: email or phone already used by another account  
+**Error** `400`: invalid `date_of_birth` or city/country mismatch
+
+---
+
+### `PUT /api/v1/admin/users/:id/role`
+**Auth**: admin or manager  
+Changes the user's **role** (permissions). The new JWT issued on next login will reflect the updated role.
+
+**Request Body**:
+```json
+{
+  "role": "referee"
+}
+```
+
+| `role` value | Access |
+|--------------|--------|
+| `player` | Standard player app |
+| `referee` | Referee API |
+| `pitch_manager` | Pitch-manager API (assign pitches via `manager_id` on rental pitches) |
+| `manager` | Admin panel (limited — cannot manage `admin` users) |
+| `admin` | Full admin panel |
+
+**Restrictions**:
+- You **cannot change your own role** (`403`).
+- **Managers** cannot assign `admin` or modify existing `admin` users (`403`).
+
+**Response** `200`: updated user object with the new `role`.
+
+**Error** `400`: missing or invalid `role`  
+**Error** `404`: user not found
+
+---
+
+### `PUT /api/v1/admin/users/:id/password`
+**Auth**: admin or manager  
+Sets a new **local password** for the user (bcrypt-hashed server-side). Useful when a staff member or player forgets their password. After reset, `auth_provider` becomes `local` so email+password login works.
+
+**Request Body**:
+```json
+{
+  "password": "NewSecurePass123"
+}
+```
+
+| Field | Rules |
+|-------|-------|
+| `password` | Required, minimum **8** characters |
+
+**Restrictions**: **Managers** cannot reset passwords for `admin` users (`403`).
+
+**Response** `200`:
+```json
+{
+  "success": true,
+  "data": {
+    "user_id": "uuid",
+    "message": "password updated"
+  }
+}
+```
+
+**Error** `404`: user not found
 
 ---
 

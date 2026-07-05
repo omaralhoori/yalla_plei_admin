@@ -16,6 +16,7 @@ import DataTable, { type Column } from '@/components/shared/DataTable'
 import PageHeader from '@/components/shared/PageHeader'
 import { useToast } from '@/hooks/use-toast'
 import { usePagination } from '@/hooks/usePagination'
+import { isFullAdmin } from '@/hooks/useAuth'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 import type { ApiResponse, PaginatedResponse, AdminUser, CreateAdminUserPayload } from '@/types/api'
@@ -70,6 +71,11 @@ export default function UsersPage() {
       return res.data.data
     },
   })
+
+  const fullAdmin = isFullAdmin()
+  const creatableRoles = fullAdmin
+    ? (['manager', 'admin', 'player', 'referee', 'pitch_manager'] as const)
+    : (['manager', 'player', 'referee', 'pitch_manager'] as const)
 
   const form = useForm<CreateUserFormValues>({
     resolver: zodResolver(createUserSchema),
@@ -248,11 +254,9 @@ export default function UsersPage() {
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="manager">Manager</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="player">Player</SelectItem>
-                        <SelectItem value="referee">Referee</SelectItem>
-                        <SelectItem value="pitch_manager">Pitch Manager</SelectItem>
+                        {creatableRoles.map(r => (
+                          <SelectItem key={r} value={r}>{ROLE_LABEL[r]}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />

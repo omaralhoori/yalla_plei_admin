@@ -55,6 +55,10 @@ export function getUser(): JwtPayload | null {
   return decodeJwt(token)
 }
 
+export function isFullAdmin(): boolean {
+  return getUser()?.role === 'admin'
+}
+
 export function isAdmin(): boolean {
   const user = getUser()
   return user?.role === 'admin' || user?.role === 'manager'

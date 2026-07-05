@@ -291,12 +291,16 @@ export interface AdminUser {
   phone: string
   emergency_phone?: string
   date_of_birth?: string
+  country_id?: string
+  city_id?: string
   role: 'player' | 'admin' | 'manager' | 'referee' | 'pitch_manager'
   gender: 'male' | 'female'
   auth_provider: string
   is_phone_verified: boolean
   is_email_verified: boolean
   created_at: string
+  country?: { id: string; name_en: string; name_ar?: string }
+  city?: { id: string; name_en: string; name_ar?: string }
 }
 
 export interface PlayerProfile {
@@ -338,6 +342,29 @@ export interface CreateAdminUserPayload {
   password: string
   role: 'player' | 'manager' | 'admin' | 'referee' | 'pitch_manager'
   gender: 'male' | 'female'
+}
+
+export interface UpdateAdminUserPayload {
+  name?: string
+  first_name?: string
+  last_name?: string
+  gender?: 'male' | 'female'
+  email?: string
+  phone?: string
+  emergency_phone?: string
+  date_of_birth?: string
+  country_id?: string
+  city_id?: string
+  is_phone_verified?: boolean
+  is_email_verified?: boolean
+}
+
+export interface ChangeUserRolePayload {
+  role: AdminUser['role']
+}
+
+export interface SetUserPasswordPayload {
+  password: string
 }
 
 export interface AdjustPointsPayload {
