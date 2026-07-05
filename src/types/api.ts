@@ -548,6 +548,10 @@ export interface XpRulePayload {
   name_en?: string
 }
 
+export interface XpRulesListResponse {
+  rules: XpRule[]
+}
+
 // ─── Monthly Leaderboard Archives ─────────────────────────────────────────────
 
 export interface MonthlyLeaderboardEntry {

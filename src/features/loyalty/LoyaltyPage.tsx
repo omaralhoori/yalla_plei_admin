@@ -22,7 +22,7 @@ import { usePagination } from '@/hooks/usePagination'
 import { api } from '@/lib/api'
 import type {
   ApiResponse, Level, LevelPayload, PointRule, PointRulePayload,
-  Reward, RewardPayload, XpRule, XpRulePayload,
+  Reward, RewardPayload, XpRule, XpRulePayload, XpRulesListResponse,
   MonthlyLeaderboardEntry, PaginatedResponse, Sport,
 } from '@/types/api'
 
@@ -730,7 +730,7 @@ function XpRulesTab() {
 
   const { data: rules = [], isLoading } = useQuery({
     queryKey: ['xp-rules'],
-    queryFn: async () => (await api.get<ApiResponse<XpRule[]>>('/admin/xp-rules')).data.data,
+    queryFn: async () => (await api.get<ApiResponse<XpRulesListResponse>>('/admin/xp-rules')).data.data.rules,
   })
 
   const form = useForm<XpRuleFormValues>({
