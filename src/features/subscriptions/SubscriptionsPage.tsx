@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form'
 import { Link } from 'react-router-dom'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Pencil, Trash2, RefreshCw, XCircle, Clock, Sparkles, Palette, ExternalLink } from 'lucide-react'
+import { Plus, Pencil, Trash2, RefreshCw, XCircle, Clock, Sparkles, Palette, ExternalLink, CreditCard, Webhook, Copy, AlertTriangle, Bell, Receipt } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -32,6 +32,14 @@ import type {
 
 function formatPlanPrice(price: number, currency: string): string {
   return `${new Intl.NumberFormat('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price)} ${currency}`
+}
+
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? 'https://api.yallaplei.com/api/v1').replace(/\/$/, '')
+const HYPERPAY_WEBHOOK_URL = `${API_BASE}/webhooks/hyperpay`
+
+function copyText(value: string, toast: ReturnType<typeof useToast>['toast']) {
+  navigator.clipboard?.writeText(value)
+  toast({ title: 'Copied to clipboard', variant: 'success' as never })
 }
 
 // ─── Plans tab ────────────────────────────────────────────────────────────────
@@ -151,6 +159,10 @@ function PlansTab() {
 
   return (
     <div>
+      <p className="text-sm text-muted-foreground mb-4">
+        Website subscribers are billed via <strong>HyperPay</strong> (tokenized card / Apple Pay). Mobile uses App Store / Google Play store product IDs below.
+        Plan price changes affect <strong>future</strong> checkouts and renewals.
+      </p>
       <div className="flex justify-end mb-4">
         <Button onClick={openCreate} className="gap-2"><Plus className="w-4 h-4" />Add Plan</Button>
       </div>
@@ -387,7 +399,16 @@ function MembersTab() {
         </div>
       ),
     },
-    { key: 'provider', header: 'Provider', cell: row => <Badge variant="outline" className="capitalize">{row.provider}</Badge> },
+    { key: 'provider', header: 'Provider', cell: row => (
+      <div>
+        <Badge variant="outline" className="capitalize">{row.provider}</Badge>
+        {row.provider === 'hyperpay' && row.provider_ref && (
+          <code className="block text-[10px] text-muted-foreground mt-1 truncate max-w-[140px]" title={row.provider_ref}>
+            {row.provider_ref}
+          </code>
+        )}
+      </div>
+    ) },
     { key: 'status', header: 'Status', cell: row => <StatusBadge status={row.status} /> },
     {
       key: 'period',
@@ -418,6 +439,10 @@ function MembersTab() {
 
   return (
     <div>
+      <p className="text-sm text-muted-foreground mb-4">
+        HyperPay members renew automatically when webhooks are configured. First payment is recorded at checkout; later charges extend <strong>Current Period</strong> via webhook.
+        Players with an active subscription cannot start a duplicate checkout.
+      </p>
       <div className="bg-card border rounded-lg p-4 mb-4 flex flex-wrap gap-3 items-end">
         <div className="space-y-1">
           <Label>Status</Label>
@@ -463,7 +488,7 @@ function MembersTab() {
       <ConfirmDialog
         open={!!cancelTarget}
         title="Cancel Subscription"
-        description="Auto-renew is turned off and benefits remain until the end of the current period. For HyperPay, the recurring schedule is stopped."
+        description="Auto-renew is turned off and benefits remain until the end of the current period. For HyperPay website billing, the recurring schedule is also stopped."
         confirmLabel="Cancel Subscription"
         variant="destructive"
         isLoading={cancelMutation.isPending}
@@ -474,21 +499,145 @@ function MembersTab() {
   )
 }
 
+// ─── HyperPay billing tab ─────────────────────────────────────────────────────
+
+function BillingTab() {
+  const { toast } = useToast()
+
+  return (
+    <div className="space-y-4 max-w-3xl">
+      <Card className="border-amber-200 bg-amber-50/50">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2 text-amber-900">
+            <AlertTriangle className="w-4 h-4" />
+            Renewals require HyperPay webhooks
+          </CardTitle>
+          <CardDescription className="text-amber-800/80">
+            The first subscription payment works through checkout, but <strong>automatic renewals will not extend</strong>{' '}
+            <code className="text-xs bg-amber-100 px-1 rounded">current_period_end</code> unless webhooks are configured.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Webhook className="w-4 h-4" />
+            Webhook setup (HyperPay portal)
+          </CardTitle>
+          <CardDescription>Administration → Webhooks in the HyperPay merchant portal</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1">URL</p>
+              <div className="flex items-center gap-2">
+                <code className="text-xs bg-muted px-2 py-1.5 rounded flex-1 break-all">{HYPERPAY_WEBHOOK_URL}</code>
+                <Button type="button" size="sm" variant="outline" onClick={() => copyText(HYPERPAY_WEBHOOK_URL, toast)}>
+                  <Copy className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1">Event types</p>
+              <div className="flex gap-2">
+                <Badge variant="secondary">PAYMENTS</Badge>
+                <Badge variant="secondary">SCHEDULES</Badge>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1">Wrapper</p>
+              <p>JSON or None (both supported)</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1">Secret → server env</p>
+              <code className="text-xs bg-muted px-2 py-1 rounded">HYPERPAY_WEBHOOK_SECRET</code>
+              <p className="text-xs text-muted-foreground mt-1">64-character hex AES key from HyperPay webhook settings</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <CreditCard className="w-4 h-4" />
+            Server environment (ops)
+          </CardTitle>
+          <CardDescription>
+            Online payment has no admin API — configure on the API server. Shares checkout settings with subscriptions.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-2 text-xs font-mono">
+            {[
+              'HYPERPAY_ENABLED',
+              'HYPERPAY_BASE_URL',
+              'HYPERPAY_ACCESS_TOKEN',
+              'HYPERPAY_ENTITY_ID_CARDS',
+              'HYPERPAY_ENTITY_ID_APPLE_PAY',
+              'HYPERPAY_CURRENCY',
+              'HYPERPAY_WEBHOOK_SECRET',
+            ].map(key => (
+              <div key={key} className="flex items-center justify-between gap-4 border-b border-dashed pb-1.5 last:border-0">
+                <span>{key}</span>
+                {key === 'HYPERPAY_WEBHOOK_SECRET' && <Badge variant="outline" className="text-[10px] font-sans">required for renewals</Badge>}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">What happens on renewal</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <div className="flex gap-3">
+            <Receipt className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
+            <p>Records a <Link to="/financials" className="text-primary hover:underline">financial transaction</Link> (idempotent by HyperPay payment id).</p>
+          </div>
+          <div className="flex gap-3">
+            <Clock className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
+            <p>Extends <code className="text-xs bg-muted px-1 rounded">current_period_end</code> by one billing period (monthly or annual).</p>
+          </div>
+          <div className="flex gap-3">
+            <Bell className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
+            <p>Sends a <code className="text-xs bg-muted px-1 rounded">subscription_renewed</code> push notification to the player.</p>
+          </div>
+          <div className="flex gap-3">
+            <RefreshCw className="w-4 h-4 shrink-0 mt-0.5 text-primary" />
+            <p>
+              Background worker retries failed HyperPay <strong>schedule creation</strong> every 15 minutes after activation.
+              Another worker expires subscriptions when the period ends.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SubscriptionsPage() {
   return (
     <div>
-      <PageHeader title="Subscriptions" subtitle="Manage subscription plans, subscriber benefits, and members" />
+      <PageHeader
+        title="Subscriptions"
+        subtitle="Plans, subscriber benefits, members, and HyperPay renewal billing"
+      />
       <Tabs defaultValue="plans">
-        <TabsList className="mb-4">
+        <TabsList className="mb-4 flex-wrap h-auto gap-1">
           <TabsTrigger value="plans">Plans</TabsTrigger>
           <TabsTrigger value="benefits">Benefits</TabsTrigger>
           <TabsTrigger value="members">Members</TabsTrigger>
+          <TabsTrigger value="billing">HyperPay Billing</TabsTrigger>
         </TabsList>
         <TabsContent value="plans"><PlansTab /></TabsContent>
         <TabsContent value="benefits"><BenefitsTab /></TabsContent>
         <TabsContent value="members"><MembersTab /></TabsContent>
+        <TabsContent value="billing"><BillingTab /></TabsContent>
       </Tabs>
     </div>
   )

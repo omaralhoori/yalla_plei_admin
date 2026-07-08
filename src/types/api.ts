@@ -871,6 +871,8 @@ export interface PlayerSubscription {
   current_period_end: string
   auto_renew: boolean
   cancelled_at?: string | null
+  /** HyperPay registration id — used to match renewal webhooks */
+  provider_ref?: string | null
   plan?: SubscriptionPlan
   user?: { id: string; first_name: string; last_name: string; email?: string; phone?: string }
 }

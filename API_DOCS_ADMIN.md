@@ -1,9 +1,12 @@
 # Yalla Plei — Admin API Documentation
 
 > **Base URL**: `https://api.yallaplei.com/api/v1`  
-> **Version**: 3.23.0  
+> **Version**: 3.24.0  
 > **Audience**: Admin panel / back-office (role = `admin` or `manager`)  
-> **Last Updated**: 2026-07-05
+> **Last Updated**: 2026-07-08
+
+### What's New in 3.24.0
+- **HyperPay subscription renewals**: configure `HYPERPAY_WEBHOOK_SECRET` and point HyperPay webhooks to `POST /webhooks/hyperpay` (types **PAYMENTS** + **SCHEDULES**). Successful renewal events extend `current_period_end`, record a **financial transaction**, and notify the player. A background worker retries failed schedule creation; subscription checkouts block duplicate active subs. See **Subscriptions Management** and **Online Payment Configuration**.
 
 ### What's New in 3.23.0
 - **Rental pitch services — strikethrough**: when attaching facilities/features to a rentable pitch, each entry can be marked `is_strikethrough: true` so players see it crossed out (e.g. temporarily unavailable). Use the `services` array on create/update/`PUT /admin/rental-pitches/:id/services`. See **Pitch Rental (Admin)**.
@@ -2224,6 +2227,14 @@ stored in the database or exposed over the API.
 | `HYPERPAY_BILLING_COUNTRY` | – | Default `billing.country`, ISO Alpha-2 (e.g. `SA`). Overridden by the customer's country code when known. |
 | `HYPERPAY_BILLING_POSTCODE` | – | Default `billing.postcode`. |
 
+### HyperPay webhooks (subscriptions)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `HYPERPAY_WEBHOOK_SECRET` | ✅ for renewals | 64-character hex AES key from HyperPay webhook settings. Used to decrypt `POST /api/v1/webhooks/hyperpay` notifications. |
+
+In the HyperPay portal, create a webhook pointing to `POST /api/v1/webhooks/hyperpay` with types **PAYMENTS** and **SCHEDULES**. Without this, the first subscription payment works via the checkout flow, but **automatic renewals will not extend** `current_period_end` in the app.
+
 > HyperPay typically issues a **separate entityId per channel** (one for cards, one for
 > Apple Pay). Set both; the backend picks the right one based on the player's chosen
 > `brand`.
@@ -2273,9 +2284,29 @@ subscriptions).
   store product via `apple_product_id` / `google_product_id` and reports purchases to the
   backend.
 
-> A background worker expires subscriptions automatically once their paid period ends.
+> Background workers: expire subscriptions when `current_period_end` passes; **retry HyperPay schedule creation** every 15 minutes when scheduling failed at activation; process **renewal webhooks** to extend the paid period when HyperPay charges again.
 
-### The benefits
+### HyperPay renewal webhooks (required for website billing)
+
+Configure in the HyperPay portal (**Administration → Webhooks**):
+
+| Setting | Value |
+|---------|-------|
+| URL | `https://api.yallaplei.com/api/v1/webhooks/hyperpay` |
+| Types | `PAYMENTS`, `SCHEDULES` |
+| Secret | 64-char hex → set as `HYPERPAY_WEBHOOK_SECRET` |
+| Wrapper | JSON or None (both supported) |
+
+On each successful **SCHEDULE** (or **PAYMENT** linked to a stored registration) event the backend:
+
+1. Finds the subscription by `registrationId` (`provider_ref`).
+2. Records a **financial transaction** (idempotent by HyperPay payment id).
+3. Extends `current_period_end` by one billing period.
+4. Sends a `subscription_renewed` push notification.
+
+The first checkout payment is recorded when the player calls `GET /payments/checkout/status`; renewal payments arrive via webhook.
+
+---
 
 | Benefit | Where it's configured | Effect |
 |---------|-----------------------|--------|
