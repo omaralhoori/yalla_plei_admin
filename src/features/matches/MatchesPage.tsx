@@ -345,18 +345,33 @@ export default function MatchesPage() {
   const isBusy = createMutation.isPending || updateMutation.isPending || createFromTemplateMutation.isPending
 
   // When a template is applied, its pitch's sport-filtered list may not have loaded yet.
-  // Surface the template's pitch as an option immediately so the Select can render the value.
-  // Falls back to allPitches (eagerly loaded for the filter bar) if the nested pitch is absent.
+  // Always include the current form pitch (and template pitch) so the Select can render
+  // the value on the first template selection — not only after changing templates again.
   const activeTemplate = !editTarget ? templates.find(t => t.id === selectedTemplateId) : undefined
   const pitchOptions = useMemo<Pitch[]>(() => {
-    const tplPitchId = activeTemplate?.pitch_id
-    const tplPitch = activeTemplate?.pitch
-      ?? (tplPitchId ? allPitches.find(p => p.id === tplPitchId) : undefined)
-    if (tplPitch && !formPitches.some(p => p.id === tplPitch.id)) {
-      return [tplPitch, ...formPitches]
+    const options = [...formPitches]
+    const ensurePitch = (pitch?: Pitch) => {
+      if (pitch && !options.some(p => p.id === pitch.id)) {
+        options.unshift(pitch)
+      }
     }
-    return formPitches
-  }, [formPitches, activeTemplate, allPitches])
+
+    if (watchedPitchId) {
+      ensurePitch(
+        allPitches.find(p => p.id === watchedPitchId)
+          ?? activeTemplate?.pitch,
+      )
+    }
+
+    if (activeTemplate?.pitch_id) {
+      ensurePitch(
+        activeTemplate.pitch
+          ?? allPitches.find(p => p.id === activeTemplate.pitch_id),
+      )
+    }
+
+    return options
+  }, [formPitches, watchedPitchId, allPitches, activeTemplate])
 
   // ─── Table columns ────────────────────────────────────────────────────────────
 
@@ -563,6 +578,7 @@ export default function MatchesPage() {
                 <FormItem>
                   <FormLabel>Pitch</FormLabel>
                   <Select
+                    key={`${selectedTemplateId}-${field.value}`}
                     onValueChange={field.onChange}
                     value={field.value}
                     disabled={!selectedSportId || !!selectedTemplateId}
